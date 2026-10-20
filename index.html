@@ -1612,12 +1612,12 @@ async function entrar(s) {
     $('login').hidden = false; $('app').hidden = true; return;
   }
   const [{ data: aprov }, { data: meu }, { data: cors }] = await Promise.all([
-    db.rpc('crm_vendas_aprovador'), db.rpc('crm_meu_corretor'), db.from('corretores').select('id, nome, ativo'),
+    db.rpc('crm_vendas_aprovador'), db.rpc('crm_meu_corretor'), db.from('corretores').select('id, nome, ativo, email'),
   ]);
   souAprovador = !!aprov; usuario = meu; MEU_CORRETOR = meu; VER = null;
   CORRETORES = Object.fromEntries((cors || []).map(c => [c.id, c.nome]));
   CORRETORES_ATIVOS = (cors || []).filter(c => c.ativo).sort((a, b) => a.nome.localeCompare(b.nome));
-  NOME_GESTOR = (CORRETORES[meu] || s.user.email.split('@')[0]).split(' ')[0];
+  NOME_GESTOR = (CORRETORES[meu] || (cors || []).find(c => (c.email || '').toLowerCase() === s.user.email.toLowerCase())?.nome || s.user.email.split('@')[0]).split(' ')[0];
   NOME_GESTOR = NOME_GESTOR.charAt(0).toUpperCase() + NOME_GESTOR.slice(1);
   $('quem-nome').textContent = souAprovador ? `${NOME_GESTOR} · gestor` : (CORRETORES[usuario] || s.user.email);
   $('vercomo-box').hidden = !souAprovador;
