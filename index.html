@@ -330,6 +330,7 @@ const codigoTxt = (im) => im.codigo ? `Cód. ${im.codigo}` : 'Sem código ainda'
 let usuario = null; // id do corretor logado
 let tela = { nome: 'lista' };
 let filtro = { busca: '', status: '' };
+let NOME_GESTOR = 'Gestor';
 let VER = null; // gestor vendo o sistema como um corretor (só visualização)
 let MEU_CORRETOR = null;
 const gestor = () => souAprovador && !VER;
@@ -1299,7 +1300,7 @@ function telaAtividades() {
     linhaMeta('Feedback da visita em até 24 h', m.feedback_no_prazo, vr, '3 pontos por visita no prazo', true, vr > 0 && m.feedback_no_prazo >= vr, vr ? null : 'sem visitas'),
     linhaMeta('Follow-up da visita em até 36 h', m.followup_no_prazo, vr, '3 pontos por visita no prazo', true, vr > 0 && m.followup_no_prazo >= vr, vr ? null : 'sem visitas'),
     linhaMeta('Comparecimento às visitas', 0, 0, '15 pontos · falta sem aviso: −50', true, !m.faltas_corretor, m.faltas_corretor ? `${m.faltas_corretor} falta${m.faltas_corretor > 1 ? 's' : ''}` : 'sem faltas'),
-    linhaMeta('Reunião comercial semanal', 0, 0, '10 pontos · presença marcada pelo Marco', true, m.reuniao === true, m.reuniao === true ? 'presente' : m.reuniao === false ? 'faltou' : 'a marcar'),
+    linhaMeta('Reunião comercial semanal', 0, 0, '10 pontos · presença marcada pelo gestor', true, m.reuniao === true, m.reuniao === true ? 'presente' : m.reuniao === false ? 'faltou' : 'a marcar'),
   ].join('');
   const forms = {
     visita_prospeccao: `<div class="q"><label>Foto no local *</label><input type="file" id="af_foto" accept="image/*" capture="environment"></div>
@@ -1616,7 +1617,9 @@ async function entrar(s) {
   souAprovador = !!aprov; usuario = meu; MEU_CORRETOR = meu; VER = null;
   CORRETORES = Object.fromEntries((cors || []).map(c => [c.id, c.nome]));
   CORRETORES_ATIVOS = (cors || []).filter(c => c.ativo).sort((a, b) => a.nome.localeCompare(b.nome));
-  $('quem-nome').textContent = souAprovador ? 'Marco · gestor' : (CORRETORES[usuario] || s.user.email);
+  NOME_GESTOR = (CORRETORES[meu] || s.user.email.split('@')[0]).split(' ')[0];
+  NOME_GESTOR = NOME_GESTOR.charAt(0).toUpperCase() + NOME_GESTOR.slice(1);
+  $('quem-nome').textContent = souAprovador ? `${NOME_GESTOR} · gestor` : (CORRETORES[usuario] || s.user.email);
   $('vercomo-box').hidden = !souAprovador;
   if (souAprovador) {
     const { data: g } = await db.rpc('crm_vendas_corretores_game');
@@ -1638,7 +1641,7 @@ $('vercomo').addEventListener('change', async (e) => {
   VER = e.target.value || null;
   usuario = VER || MEU_CORRETOR;
   document.body.classList.toggle('vendo-como', !!VER);
-  $('quem-nome').textContent = VER ? `vendo como ${CORRETORES[VER]}` : 'Marco · gestor';
+  $('quem-nome').textContent = VER ? `vendo como ${CORRETORES[VER]}` : `${NOME_GESTOR} · gestor`;
   ATV.carregado = false; ATV.metas = null; PTS.carregado = false; PTS.ranking = null; COM.carregado = false; COM.dados = null; PNL.dados = null;
   await Promise.all([carregar(), carregarFunil()]);
   tela = { nome: 'funil' }; render();
