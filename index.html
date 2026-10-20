@@ -1,0 +1,1650 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRM Vendas · Imóveis</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --fundo: #f6f4f1; --card: #ffffff; --borda: #e6e1da; --texto: #2a2522; --suave: #7a716a;
+    --destaque: #7a1f2b; --destaque-claro: #f3e7e8;
+    --verde: #2f6b2f; --verde-claro: #e6f1e1; --ambar: #8a5a0b; --ambar-claro: #faefd9;
+    --vermelho: #a32d2d; --vermelho-claro: #fcebeb; --azul: #185fa5; --azul-claro: #e6f1fb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fundo: #17191c; --card: #202328; --borda: #30343a; --texto: #ecebe8; --suave: #9a9892;
+      --destaque: #e0808c; --destaque-claro: #3a2428;
+      --verde: #9fd39a; --verde-claro: #23331f; --ambar: #f0c070; --ambar-claro: #3a2f18;
+      --vermelho: #f09595; --vermelho-claro: #3a1f1f; --azul: #85b7eb; --azul-claro: #1b2a3a;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--fundo); color: var(--texto); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--borda); background: var(--card); color: var(--texto); padding: 6px 12px; }
+  button:hover { border-color: var(--suave); }
+  input, select, textarea { font: inherit; width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--borda); background: var(--card); color: var(--texto); }
+  textarea { resize: vertical; }
+  .principal { background: var(--destaque); color: #fff; border-color: var(--destaque); }
+  @media (prefers-color-scheme: dark) { .principal { color: #17191c; } }
+
+  header { background: var(--card); border-bottom: 1px solid var(--borda); padding: 10px 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0; }
+  .abas { display: flex; gap: 4px; }
+  .abas button { border: none; background: none; color: var(--suave); padding: 6px 10px; }
+  .abas button.on { color: var(--destaque); background: var(--destaque-claro); }
+  .quem { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--suave); }
+  .quem select { width: auto; padding: 4px 8px; }
+  #faixa-vercomo { display: none; background: var(--azul-claro); color: var(--azul); font-size: 13px; padding: 6px 16px; }
+  body.vendo-como #faixa-vercomo { display: block; }
+  #login { max-width: 380px; margin: 10vh auto; padding: 0 16px; }
+  #aviso { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--texto); color: var(--fundo); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100% - 32px); z-index: 10; }
+  #aviso.erro { background: var(--vermelho); color: #fff; }
+  .link { background: none; border: none; color: var(--azul); padding: 0 4px; text-decoration: underline; font-size: 13px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .kpi { background: var(--card); border: 1px solid var(--borda); border-radius: 12px; padding: 12px 14px; }
+  .kpi small { color: var(--suave); font-size: 12px; display: block; }
+  .kpi b { font-size: 22px; font-weight: 600; }
+  .barra { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .barra input { max-width: 260px; }
+  .barra select { width: auto; }
+
+  .lista { display: grid; gap: 8px; }
+  .im { background: var(--card); border: 1px solid var(--borda); border-radius: 12px; padding: 12px 14px; display: grid; grid-template-columns: 56px minmax(0,1fr) auto; gap: 12px; align-items: center; cursor: pointer; }
+  .im:hover { border-color: var(--suave); }
+  .nota { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 17px; border: 3px solid var(--borda); }
+  .im .t { font-weight: 600; }
+  .im .s { font-size: 13px; color: var(--suave); }
+  .selos { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .selo { font-size: 12px; padding: 2px 8px; border-radius: 6px; background: var(--fundo); color: var(--suave); white-space: nowrap; }
+  .selo.verde { background: var(--verde-claro); color: var(--verde); }
+  .selo.ambar { background: var(--ambar-claro); color: var(--ambar); }
+  .selo.vermelho { background: var(--vermelho-claro); color: var(--vermelho); }
+  .selo.azul { background: var(--azul-claro); color: var(--azul); }
+  .selo.vinho { background: var(--destaque-claro); color: var(--destaque); }
+  .vazio { text-align: center; color: var(--suave); padding: 40px 0; }
+
+  .form { display: grid; grid-template-columns: minmax(0,1fr) 260px; gap: 16px; align-items: start; }
+  .card { background: var(--card); border: 1px solid var(--borda); border-radius: 12px; padding: 16px 18px; }
+  .passos { display: flex; gap: 4px; margin-bottom: 6px; }
+  .passos div { height: 4px; flex: 1; border-radius: 2px; background: var(--borda); cursor: pointer; }
+  .passos div.on { background: var(--destaque); }
+  .ptit { font-size: 12px; color: var(--suave); margin-bottom: 12px; }
+  .card h2 { font-size: 17px; margin: 0 0 14px; }
+  .q { margin-bottom: 14px; }
+  .q > label { display: block; font-size: 13px; color: var(--suave); margin-bottom: 4px; }
+  .q .dica { font-size: 12px; color: var(--suave); margin-top: 4px; }
+  .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips button { font-size: 13px; padding: 4px 10px; }
+  .chips button.on { background: var(--destaque-claro); color: var(--destaque); border-color: var(--destaque); }
+  .arq { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--borda); flex-wrap: wrap; }
+  .arq:last-child { border-bottom: 0; }
+  .arq .n { font-size: 14px; }
+  .arq .f { font-size: 12px; color: var(--suave); }
+  .arq label.btn { border: 1px solid var(--borda); border-radius: 8px; padding: 5px 12px; cursor: pointer; font-size: 14px; white-space: nowrap; }
+  .arq label.btn:hover { border-color: var(--suave); }
+  .arq input[type=file] { display: none; }
+  .fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 6px; margin-top: 10px; }
+  .fotos div { aspect-ratio: 4/3; border-radius: 6px; background: var(--fundo) center/cover; border: 1px solid var(--borda); font-size: 11px; color: var(--suave); display: flex; align-items: flex-end; padding: 3px; overflow: hidden; }
+  .nav { display: flex; justify-content: space-between; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+  .erro { color: var(--vermelho); font-size: 13px; min-height: 18px; margin-top: 6px; }
+
+  .placar { position: sticky; top: 12px; }
+  .placar .grande { text-align: center; }
+  .placar .grande b { font-size: 40px; font-weight: 600; display: block; line-height: 1.1; }
+  .trilho { height: 6px; background: var(--borda); border-radius: 3px; overflow: hidden; margin: 8px 0; }
+  .trilho div { height: 6px; background: var(--destaque); }
+  .itens { margin-top: 10px; font-size: 12px; }
+  .itens div { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; color: var(--suave); border-bottom: 1px dashed var(--borda); }
+  .itens div.ok { color: var(--verde); }
+  .itens div.dep { font-style: italic; }
+
+  .det { display: grid; grid-template-columns: minmax(0,1fr) 260px; gap: 16px; align-items: start; }
+  .linha { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--borda); font-size: 14px; }
+  .linha span:first-child { color: var(--suave); }
+  .bloco { margin-bottom: 16px; }
+  .bloco h3 { font-size: 14px; margin: 0 0 6px; color: var(--suave); font-weight: 600; }
+  .aviso { border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 12px; }
+
+  .kanban { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; align-items: flex-start; }
+  .kcol { background: var(--card); border: 1px solid var(--borda); border-radius: 12px; padding: 8px; flex: 0 0 210px; }
+  .kgrp { background: var(--card); border: 1px solid var(--borda); border-radius: 12px; padding: 8px; flex: 0 0 auto; }
+  .kgrp .kcol { border: none; background: var(--fundo); flex-basis: 196px; }
+  .kgrp .sub { display: flex; gap: 6px; }
+  .khead { font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; margin: 2px 2px 8px; }
+  .khead span:last-child { text-align: right; white-space: nowrap; }
+  .kcard { background: var(--fundo); border: 1px solid var(--borda); border-radius: 10px; padding: 8px 9px; margin-bottom: 6px; cursor: pointer; font-size: 13px; }
+  .kgrp .kcard { background: var(--card); }
+  .kcard.katrasado { border-color: var(--vermelho); background: var(--vermelho-claro); }
+  .kcard.kamarelo { border-color: var(--ambar); }
+  .kaviso { font-size: 12px; font-weight: 700; margin: -2px 0 6px; color: var(--ambar); }
+  .katrasado .kaviso { color: var(--vermelho); }
+  .kcard:hover { border-color: var(--suave); }
+  .kcard b { font-weight: 600; display: block; }
+  .ktopo { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .ktopo b { font-size: 14px; }
+  .kav { width: 30px; height: 30px; flex: 0 0 30px; border-radius: 8px; background: var(--destaque-claro); color: var(--destaque); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+  .ktel { font-size: 12px; color: var(--suave); display: flex; align-items: center; gap: 4px; }
+  .kcopia { border: none; background: none; padding: 0 4px; color: var(--suave); font-size: 13px; }
+  .kult { font-size: 12px; color: var(--suave); margin: 6px 0; font-weight: 600; }
+  .kult.alerta { color: var(--vermelho); }
+  .kmover { width: 100%; padding: 6px; font-size: 13px; font-weight: 600; color: var(--destaque); background: var(--destaque-claro); border-color: var(--destaque-claro); }
+  .kmover:hover { border-color: var(--destaque); }
+  .ktransf { margin-top: 5px; color: var(--azul); background: var(--azul-claro); border-color: var(--azul-claro); }
+  .ktransf:hover { border-color: var(--azul); }
+  #modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 20; }
+  #modal .card { width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto; }
+  .kcard .s { font-size: 12px; color: var(--suave); }
+  .gchk { border-collapse: collapse; font-size: 12px; min-width: 100%; }
+  .gchk th, .gchk td { border-bottom: 1px solid var(--borda); padding: 6px 4px; text-align: center; white-space: nowrap; }
+  .gchk .gnome { text-align: left; min-width: 190px; position: sticky; left: 0; background: var(--card); font-size: 13px; padding-right: 10px; }
+  .gchk .gnome small { display: block; color: var(--suave); font-size: 11px; }
+  .gchk .gsem { color: var(--suave); font-weight: 600; letter-spacing: .04em; border-left: 1px solid var(--borda); }
+  .gchk .gdia { font-weight: 700; min-width: 30px; }
+  .gchk .gdia small { display: block; color: var(--suave); font-weight: 400; font-size: 10px; }
+  .gchk .gtot { border-right: 1px solid var(--borda); min-width: 54px; color: var(--suave); font-size: 11px; }
+  .gchk .ghoje { background: var(--destaque-claro); }
+  .gchk td.gcel, .gchk td.gclick { cursor: pointer; }
+  .gchk td.gclick:hover { color: var(--destaque); }
+  .gchk td.gcel:hover { outline: 2px solid var(--destaque); outline-offset: -2px; border-radius: 6px; }
+  .card.destacar { box-shadow: 0 0 0 2px var(--destaque); }
+  .gn { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; border-radius: 6px; background: var(--destaque); color: var(--card); font-weight: 700; font-size: 11px; padding: 0 4px; }
+  .gvazio { display: inline-block; width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--borda); }
+  .gvazio.gfut { opacity: .4; }
+  .gmeses { display: flex; gap: 4px; flex-wrap: wrap; }
+  .gmeses button { padding: 4px 9px; font-size: 12px; }
+  .meta { margin-bottom: 12px; }
+  .meta .t { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+  .meta .trilho { margin: 5px 0 2px; }
+  .meta .p { font-size: 12px; color: var(--suave); }
+  .ativbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .ativbtns button { text-align: left; padding: 9px 10px; }
+  .ativbtns button.on { border-color: var(--destaque); color: var(--destaque); background: var(--destaque-claro); }
+  .lin { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--borda); font-size: 14px; flex-wrap: wrap; }
+  .lin:last-child { border-bottom: 0; }
+  .hist { border-left: 2px solid var(--borda); padding: 2px 0 12px 12px; font-size: 14px; }
+  .hist b { font-weight: 600; }
+  @media (max-width: 760px) {
+    .form, .det { grid-template-columns: 1fr; }
+    .placar { position: static; }
+    .im { grid-template-columns: 48px minmax(0,1fr); }
+    .im > :last-child { grid-column: 2; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>CRM Vendas</h1>
+  <nav class="abas" id="abas"></nav>
+  <div class="quem" id="quem" hidden><span id="vercomo-box" hidden>Ver como <select id="vercomo"></select></span><span id="quem-nome"></span><button id="sair">Sair</button></div>
+</header>
+<section id="login" hidden>
+  <form class="card" id="form-login">
+    <h2 style="margin:0 0 4px">Entrar</h2>
+    <p style="color:var(--suave);margin:0 0 14px;font-size:14px">Use o mesmo e-mail e senha do CRM Leads.</p>
+    <div class="q"><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required></div>
+    <div class="q"><label for="senha">Senha</label><input id="senha" type="password" autocomplete="current-password" required></div>
+    <div class="erro" id="erro-login"></div>
+    <button class="principal" style="width:100%;padding:10px">Entrar</button>
+  </form>
+</section>
+<div id="faixa-vercomo">Você está vendo o sistema como o corretor vê. O que registrar aqui (atividades, imóveis, leads) entra no nome desse corretor e fica marcado como lançado por você. Para voltar, escolha "Ver como: Gestor".</div>
+<main id="app" hidden></main>
+<div id="aviso" hidden></div>
+<div id="modal" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+
+<script>
+const SUPABASE_URL = "https://jgdbnkwhmesgjvsymgma.supabase.co";
+const SUPABASE_KEY = "sb_publishable_qvAy43WiHGUyk0aitpg_WQ_2xYfKEKu";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let CORRETORES = {}, CORRETORES_ATIVOS = [];
+const TIPOS = { casa: 'Casa', apto: 'Apartamento', sala: 'Sala comercial', terreno: 'Terreno' };
+const HOJE = () => new Date(new Date().toDateString());
+const dias = (iso) => iso ? Math.floor((HOJE() - new Date(iso + 'T00:00:00')) / 86400000) : null;
+const isoDiasAtras = (n) => { const d = HOJE(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+const vazio = (v) => v === undefined || v === null || v === '';
+const brl = (v) => vazio(v) ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// Tabela de pontos do documento "Processo de Vendas e Gamificação" (c=casa, a=apartamento, s=sala, t=terreno; null = não existe)
+const ITENS = [
+  { k: 'end', l: 'Endereço, finalidade e tipo', p: [2, 2, 2, 2], o: 1, ok: d => d.tipo && d.cep && d.rua && d.numero && d.bairro && d.cidade },
+  { k: 'seo', l: 'Título e descrição SEO', p: [8, 8, 8, 8], o: 1, ok: d => d.estado && d.dest.length >= 2 && d.perto.length >= 1 },
+  { k: 'venda', l: 'Valor de venda', p: [3, 3, 3, 3], o: 1, ok: d => +d.venda > 0 },
+  { k: 'area', l: 'Área principal', p: [3, 3, 3, 4], o: 1, ok: d => +d.area > 0 && (d.tipo !== 'terreno' || (+d.frente > 0 && +d.laterais > 0)) },
+  { k: 'aterr', l: 'Área do terreno', p: [2, null, null, null], ok: d => +d.area_terreno > 0 },
+  { k: 'comodos', l: 'Cômodos', p: [3, 3, 3, null], o: 1, ok: d => d.tipo === 'sala' ? !vazio(d.banh) : (!vazio(d.quartos) && !vazio(d.banh)) },
+  { k: 'topo', l: 'Topografia', p: [null, null, null, 3], o: 1, ok: d => d.topografia },
+  { k: 'condiptu', l: 'Condomínio e IPTU', p: [4, 4, 4, 4], ok: d => !vazio(d.iptu) && (d.tipo === 'casa' || d.tipo === 'terreno' || !vazio(d.condominio)) },
+  { k: 'vagas', l: 'Vagas de garagem', p: [2, 2, 2, null], ok: d => !vazio(d.vagas) && (+d.vagas === 0 || d.vaga_tipo) },
+  { k: 'andar', l: 'Andar e posição', p: [null, 2, 2, null], ok: d => !vazio(d.andar) && (d.tipo === 'apto' ? d.posicao : d.divisorias) },
+  { k: 'ref', l: 'Pontos de referência e acesso', p: [3, 3, 3, 3], ok: d => d.ref },
+  { k: 'fin', l: 'Financiamento e permuta', p: [2, 2, 2, 2], ok: d => d.fin && d.perm },
+  { k: 'lazer', l: 'Lazer (3 itens)', p: [2, 2, null, 2], ok: d => d.tipo === 'terreno' && d.loteamento === 'nao' ? true : d.lazer.length >= 3 },
+  { k: 'intr', l: 'Itens internos (3)', p: [2, 2, 2, null], ok: d => d.intr.length >= 3 },
+  { k: 'ext', l: 'Itens externos ou do prédio (3)', p: [2, 2, 2, null], ok: d => d.ext.length >= 3 },
+  { k: 'uso', l: 'Uso permitido / zoneamento', p: [null, null, 2, 4], ok: d => d.tipo === 'sala' ? d.usos : d.zoneamento },
+  { k: 'infra', l: 'Infraestrutura', p: [null, null, null, 3], ok: d => d.infra.length > 0 },
+  { k: 'mat', l: 'PDF da matrícula (até 30 dias)', p: [8, 8, 8, 10], ok: d => d.mat_arq && d.mat_data && dias(d.mat_data) <= 30 && dias(d.mat_data) >= 0 },
+  { k: 'cnh', l: 'CNH ou RG e CPF do proprietário', p: [4, 4, 4, 4], o: 1, ok: d => d.cnh_arq },
+  { k: 'comp', l: 'Comprovante de endereço', p: [4, 4, 4, 4], o: 1, ok: d => d.comp_arq },
+  { k: 'aver', l: 'Averbação regular', p: [4, 4, 4, null], ok: d => d.aver === 'sim' },
+  { k: 'cnd', l: 'Certidão negativa municipal', p: [null, null, null, 2], ok: d => d.cnd_arq },
+  { k: 'fotos', l: 'Fotos no padrão', p: [12, 12, 12, 12], o: 1, ok: d => d.fotos.length >= (d.tipo === 'terreno' ? 10 : 15) },
+  { k: 'fachada', l: 'Fachada e todos os ambientes', p: [3, 3, 3, null], o: 1, ok: d => d.fachada },
+  { k: 'drone', l: 'Foto aérea ou drone', p: [null, null, null, 3], ok: d => d.drone_arq },
+  { k: 'placa', l: 'Placa instalada (foto)', p: [14, 14, 14, 18], ok: d => d.placa_arq || ((d.tipo === 'apto' || d.tipo === 'sala') && d.placa_proib_arq) },
+  { k: 'video', l: 'Vídeo ou tour 360', p: [5, 5, 5, 5], ok: d => d.video },
+  { k: 'chave', l: 'Chave na imobiliária', p: [4, 4, 4, null], ok: d => d.chave },
+  { k: 'rel', l: 'Relatório mensal ao proprietário', p: [4, 4, 4, 4], dep: 1, ok: d => d.relatorio },
+];
+const IDX = { casa: 0, apto: 1, sala: 2, terreno: 3 };
+
+function pontuar(d) {
+  const i = IDX[d.tipo || 'casa'];
+  let total = 0, obr = 0, obrMax = 0;
+  const linhas = [];
+  for (const it of ITENS) {
+    const p = it.p[i];
+    if (p === null) continue;
+    const ok = !!it.ok(d);
+    if (it.o) obrMax += p;
+    if (ok) { total += p; if (it.o) obr += p; }
+    linhas.push({ ...it, pts: p, ok });
+  }
+  return { total, obr, obrMax, completo: obr === obrMax, linhas };
+}
+function faixa(n, completo) {
+  if (!completo) return { t: 'Faltam obrigatórios', c: 'vermelho' };
+  if (n >= 90) return { t: 'Faixa 90 a 100', c: 'verde' };
+  if (n >= 70) return { t: 'Faixa 70 a 89', c: 'azul' };
+  return { t: 'Faixa 0 a 69', c: 'ambar' };
+}
+function situacaoAtualizacao(im) {
+  if (im.status !== 'ativo') return null;
+  const n = dias(im.atualizado_em);
+  if (n >= 61) return { t: `${n} dias · perde a posse`, c: 'vermelho', n };
+  if (n >= 41) return { t: `${n} dias · desatualizado`, c: 'vermelho', n };
+  if (n >= 30) return { t: `${n} dias · atualizar agora`, c: 'ambar', n };
+  return { t: `Atualizado há ${n} dias`, c: 'verde', n };
+}
+const STATUS = {
+  rascunho: { t: 'Rascunho', c: '' },
+  aguardando: { t: 'Aguardando aprovação', c: 'azul' },
+  devolvido: { t: 'Devolvido para ajuste', c: 'vinho' },
+  ativo: { t: 'Aprovado · ativo', c: 'verde' },
+};
+
+function novoImovel(corretor) {
+  return {
+    id: crypto.randomUUID(), corretor, status: 'rascunho', codigo: null, codigo_imoview: '',
+    tipo: '', cep: '', rua: '', numero: '', compl: '', uf: '', end: '', bairro: '', cidade: '', ref: '', predio: '', venda: '', condominio: '', iptu: '', fin: '', perm: '',
+    area: '', area_global: '', area_terreno: '', salas: '', vaga_tipo: '', andares: '', unid_andar: '', elevadores: '', medidas: '', frente: '', laterais: '', area_auto: true, quartos: '', suites: '', banh: '', copa: '', vagas: '', andar: '', posicao: '', divisorias: '',
+    usos: '', zoneamento: '', topografia: '', loteamento: '', infra: [], lazer: [], intr: [], ext: [],
+    estado: '', dest: [], perto: [], perfil: [], frase: '',
+    mat_num: '', mat_cartorio: '', mat_arq: '', mat_data: '', cnh_arq: '', comp_arq: '', aver: '', aver_arq: '', cnd_arq: '',
+    fotos: [], fotos_paths: [], arqs: {}, fachada: false, drone_arq: '', placa_arq: '', placa_proib_arq: '', video: '', chave: false, relatorio: false,
+    historico: [],
+  };
+}
+let DB = { imoveis: [] };
+const fotosSessao = {};
+let sessao = null, souAprovador = false;
+
+// Colunas próprias da tabela; o resto do formulário vai inteiro em "dados".
+const FORA_DE_DADOS = ['id', 'corretor', 'status', 'codigo', 'codigo_imoview', 'enviado_em', 'aprovado_em', 'atualizado_em', 'obs_devolucao', 'historico'];
+const dataBR = (ts) => ts ? new Date(ts).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) : null;
+function deLinha(r) {
+  return Object.assign(novoImovel(r.corretor_id), r.dados || {}, {
+    id: r.id, corretor: r.corretor_id, status: r.status, tipo: r.tipo || '', codigo: r.codigo, codigo_imoview: r.codigo_imoview || '',
+    enviado_em: dataBR(r.enviado_em), aprovado_em: dataBR(r.aprovado_em), atualizado_em: r.atualizado_em, obs_devolucao: r.obs_devolucao || '', historico: [],
+  });
+}
+function paraLinha(im) {
+  const dados = {};
+  for (const [k, v] of Object.entries(im)) if (!FORA_DE_DADOS.includes(k)) dados[k] = v;
+  return { id: im.id, corretor_id: im.corretor, status: im.status, tipo: im.tipo || null, codigo_imoview: String(im.codigo_imoview || '').trim() || null, dados, nota: pontuar(im).total };
+}
+let POSSE = [];
+async function carregar() {
+  if (souAprovador && !VER) { const { data: pp } = await db.rpc('crm_vendas_pedidos_posse'); POSSE = pp || []; } else POSSE = [];
+  const { data, error } = await db.from('crm_vendas_imoveis').select('*').order('criado_em', { ascending: false });
+  if (error) { aviso('Não foi possível carregar os imóveis. Tente de novo.', true); return; }
+  DB.imoveis = data.map(deLinha).filter(im => !VER || im.corretor === VER);
+}
+let avisoTimer;
+function aviso(txt, erro) {
+  const el = document.getElementById('aviso');
+  el.textContent = txt; el.className = erro ? 'erro' : ''; el.hidden = false;
+  clearTimeout(avisoTimer); avisoTimer = setTimeout(() => (el.hidden = true), 4000);
+}
+const codigoTxt = (im) => im.codigo ? `Cód. ${im.codigo}` : 'Sem código ainda';
+
+let usuario = null; // id do corretor logado
+let tela = { nome: 'lista' };
+let filtro = { busca: '', status: '' };
+let VER = null; // gestor vendo o sistema como um corretor (só visualização)
+let MEU_CORRETOR = null;
+const gestor = () => souAprovador && !VER;
+const meus = () => DB.imoveis;
+
+function render() {
+  if (tela.nome !== 'form' && tela.nome !== 'enviado') modoLink = false;
+  document.getElementById('abas').hidden = modoLink;
+  const abas = gestor() ? [['painel', 'Painel']] : [];
+  abas.push(['pre', 'Pré-atendimento'], ['funil', 'Funil de vendas'], ['lista', 'Imóveis'], ['ativ', 'Atividades'], ['pontos', 'Pontuação'], ['comissao', 'Comissão']);
+  if (gestor()) { const n = DB.imoveis.filter(i => i.status === 'aguardando').length + POSSE.length; abas.push(['aprovacao', n ? `Aprovação 🔔 ${n}` : 'Aprovação (0)']); }
+  const leadAberto = tela.nome === 'lead' ? FUN.leads.find(x => x.id === tela.id) : null;
+  const atual = tela.nome === 'painel' ? 'painel' : tela.nome === 'comissao' ? 'comissao' : tela.nome === 'pontos' ? 'pontos' : tela.nome === 'ativ' ? 'ativ' : tela.nome === 'pre' || (leadAberto && noPre(leadAberto)) ? 'pre' : ['funil', 'lead', 'novolead'].includes(tela.nome) ? 'funil' : tela.nome === 'aprovacao' ? 'aprovacao' : 'lista';
+  document.getElementById('abas').innerHTML = abas.map(([k, t]) => `<button data-aba="${k}" class="${atual === k ? 'on' : ''}">${t}</button>`).join('');
+  const app = document.getElementById('app');
+  if (tela.nome === 'lista') app.innerHTML = telaLista();
+  else if (tela.nome === 'aprovacao') app.innerHTML = telaAprovacao();
+  else if (tela.nome === 'form') app.innerHTML = telaForm();
+  else if (tela.nome === 'det') app.innerHTML = telaDetalhe();
+  else if (tela.nome === 'enviado') app.innerHTML = telaEnviado();
+  else if (tela.nome === 'funil') app.innerHTML = telaFunil('vendas');
+  else if (tela.nome === 'pre') app.innerHTML = telaFunil('pre');
+  else if (tela.nome === 'painel') { app.innerHTML = telaPainel(); if (!PNL.dados) carregarPainel(); }
+  else if (tela.nome === 'comissao') { app.innerHTML = telaComissao(); if (!COM.carregado) carregarComissao(); }
+  else if (tela.nome === 'pontos') { app.innerHTML = telaPontos(); if (!PTS.carregado) carregarPontos(); }
+  else if (tela.nome === 'ativ') { app.innerHTML = telaAtividades(); if (!ATV.carregado) carregarAtividades();
+    const th = app.querySelector('.gchk th.ghoje'); if (th) { const box = th.closest('div'); box.scrollLeft = Math.max(0, th.offsetLeft - 260); } }
+  else if (tela.nome === 'lead') app.innerHTML = telaLead();
+  else if (tela.nome === 'novolead') app.innerHTML = telaNovoLead();
+  if (tela.nome === 'det') extrasDetalhe(tela.id);
+  if (tela.nome === 'lead') historicoLead(tela.id);
+  window.scrollTo(0, 0);
+}
+
+function cartao(im) {
+  const { total, completo } = pontuar(im);
+  const fx = faixa(total, completo);
+  const st = STATUS[im.status];
+  const at = situacaoAtualizacao(im);
+  const cor = { verde: 'var(--verde)', azul: 'var(--azul)', ambar: 'var(--ambar)', vermelho: 'var(--vermelho)' }[fx.c];
+  return `<div class="im" data-abrir="${im.id}">
+    <div class="nota" style="border-color:${cor};color:${cor}">${total}</div>
+    <div>
+      <div class="t">${esc(TIPOS[im.tipo] || 'Tipo não definido')} · ${esc(im.bairro || 'sem bairro')}</div>
+      <div class="s">${esc(im.end || 'Endereço não preenchido')} · ${brl(im.venda)}${gestor() ? ' · ' + esc(CORRETORES[im.corretor] || '') : ''}</div>
+      <div class="selos"><span class="selo ${st.c}">${st.t}</span>${at ? `<span class="selo ${at.c}">${at.t}</span>` : ''}<span class="selo">${codigoTxt(im)}</span>${im.codigo_imoview ? `<span class="selo">Imoview ${esc(im.codigo_imoview)}</span>` : ''}</div>
+    </div>
+    <div class="s" style="text-align:right">${fx.t}</div>
+  </div>`;
+}
+
+function telaLista() {
+  const lista = meus();
+  const ativos = lista.filter(i => i.status === 'ativo');
+  const media = ativos.length ? Math.round(ativos.reduce((s, i) => s + pontuar(i).total, 0) / ativos.length) : 0;
+  const atualizados = ativos.filter(i => dias(i.atualizado_em) <= 40).length;
+  const pct = ativos.length ? Math.round(atualizados / ativos.length * 100) : 0;
+  const semana = lista.filter(i => i.aprovado_em && dias(i.aprovado_em) <= 6).length;
+  const risco = ativos.filter(i => dias(i.atualizado_em) >= 41).length;
+  const q = filtro.busca.toLowerCase();
+  const filtrados = lista.filter(i => (!filtro.status || i.status === filtro.status) &&
+    (!q || [i.end, i.bairro, i.codigo, i.codigo_imoview, TIPOS[i.tipo], CORRETORES[i.corretor]].join(' ').toLowerCase().includes(q)));
+  return `
+    <div class="kpis">
+      <div class="kpi"><small>Imóveis ativos</small><b>${ativos.length}</b></div>
+      <div class="kpi"><small>Nota média da carteira</small><b>${media}</b> <span class="selo ${media >= 75 ? 'verde' : 'ambar'}">meta 75</span></div>
+      <div class="kpi"><small>Carteira atualizada</small><b>${pct}%</b> <span class="selo ${pct >= 90 ? 'verde' : 'ambar'}">meta 90%</span></div>
+      <div class="kpi"><small>Aprovados nesta semana</small><b>${semana}/3</b></div>
+      <div class="kpi"><small>Desatualizados (41+ dias)</small><b style="color:${risco ? 'var(--vermelho)' : 'inherit'}">${risco}</b></div>
+    </div>
+    <div class="barra">
+      <input id="busca" placeholder="Buscar endereço, bairro, código ou código Imoview" value="${esc(filtro.busca)}">
+      <select id="fstatus">
+        <option value="">Todos</option>
+        ${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${filtro.status === k ? 'selected' : ''}>${v.t}</option>`).join('')}
+      </select>
+      ${gestor() ? '' : '<button class="principal" data-novo style="margin-left:auto">+ Cadastrar imóvel</button>'}
+    </div>
+    <div class="lista">${filtrados.map(cartao).join('') || '<div class="vazio">Nenhum imóvel aqui ainda.</div>'}</div>`;
+}
+
+function telaAprovacao() {
+  const fila = DB.imoveis.filter(i => i.status === 'aguardando');
+  const posse = POSSE.length ? `<div class="card" style="margin-bottom:16px;border-color:var(--vermelho)"><h2 style="font-size:16px;margin:0 0 4px">Transferência de posse · 61º dia sem atualização</h2>
+    <div class="dica" style="margin-bottom:8px">Pela regra, o corretor perde o agenciamento no 61º dia. Escolha para quem vai o imóvel, ou mantenha com ele (o prazo recomeça).</div>
+    ${POSSE.map(p => `<div class="lin" style="align-items:flex-start"><span style="flex:1;min-width:220px"><b style="font-weight:600">Cód. ${p.codigo} · ${esc(TIPOS[p.tipo] || 'Imóvel')} · ${esc(p.bairro || '')}</b><br>
+        <span class="dica">${esc(p.endereco || '')} · nota ${p.nota} · com ${esc(p.de_nome)} há ${p.dias} dias sem atualizar</span>
+        <div class="grade" style="margin-top:8px"><select id="pp_para_${p.id}"><option value="">Novo corretor</option>${CORRETORES_ATIVOS.filter(c => c.id !== p.de_corretor && !eSdr(c.id)).map(c => `<option value="${c.id}" ${c.id === p.sugerido ? 'selected' : ''}>${esc(c.nome)}${c.id === p.sugerido ? ' (sugerido: menos imóveis)' : ''}</option>`).join('')}</select>
+        <input id="pp_obs_${p.id}" placeholder="Observação (opcional)"></div></span>
+      <span style="display:flex;gap:6px;flex-wrap:wrap"><button class="principal" data-posse="${p.id}" data-acao="transferir">Transferir</button><button data-posse="${p.id}" data-acao="manter">Manter com ${esc(p.de_nome)}</button></span></div>`).join('')}</div>` : '';
+  return `${posse}<p style="color:var(--suave);margin-top:0">Agenciamentos enviados pelos corretores. Só contam na meta e pontuam depois que você aprova.</p>
+    <div class="lista">${fila.map(cartao).join('') || '<div class="vazio">Nada esperando aprovação.</div>'}</div>`;
+}
+
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-posse]'); if (!b) return;
+  const id = b.dataset.posse, acao = b.dataset.acao;
+  const para = document.getElementById('pp_para_' + id)?.value || null, obs = document.getElementById('pp_obs_' + id)?.value.trim() || null;
+  if (acao === 'transferir' && !para) { aviso('Escolha o novo corretor.', true); return; }
+  b.disabled = true;
+  const { error } = await db.rpc('crm_vendas_decidir_posse', { p_pedido: +id, p_acao: acao, p_para: para, p_obs: obs });
+  b.disabled = false;
+  if (error) { aviso(error.message, true); return; }
+  aviso(acao === 'transferir' ? 'Posse transferida para ' + (CORRETORES[para] || 'o corretor') + '.' : 'Posse mantida; o prazo recomeçou.');
+  await carregar(); render();
+});
+
+// ---------- formulário ----------
+const PASSOS = ['Tipo e endereço', 'Valores', 'Áreas e cômodos', 'Características', 'Sobre o imóvel', 'Documentos', 'Fotos e divulgação'];
+const OPC = {
+  lazer: { casa: ['Piscina', 'Churrasqueira', 'Pátio', 'Área gourmet', 'Jardim', 'Playground'], apto: ['Piscina', 'Salão de festas', 'Academia', 'Playground', 'Churrasqueira', 'Espaço gourmet'], terreno: ['Área verde', 'Quadra', 'Playground', 'Portaria 24h', 'Clube', 'Ciclovia'] },
+  intr: { casa: ['Armários', 'Ar-condicionado', 'Suíte', 'Lavanderia', 'Lareira', 'Cozinha integrada', 'Closet', 'Mobiliado'], apto: ['Armários', 'Ar-condicionado', 'Sacada com churrasqueira', 'Lavanderia', 'Cozinha integrada', 'Closet', 'Mobiliado'], sala: ['Ar-condicionado', 'Piso porcelanato', 'Rede elétrica nova', 'Rede lógica', 'Forro', 'Recepção'] },
+  ext: { casa: ['Muro', 'Portão eletrônico', 'Jardim', 'Garagem coberta', 'Energia solar', 'Cerca elétrica'], apto: ['Elevador', 'Portaria', 'Bicicletário', 'Gerador', 'Câmeras', 'Vaga visitante'], sala: ['Elevador', 'Portaria', 'Acessibilidade', 'Estacionamento', 'Câmeras', 'Gerador'] },
+  infra: ['Água', 'Luz', 'Esgoto', 'Pavimentação'],
+  estado: ['Novo', 'Seminovo', 'Reformado', 'Bom estado', 'Precisa de reforma'],
+  dest: ['Sol da manhã', 'Vista livre', 'Pátio amplo', 'Cozinha integrada', 'Pé-direito alto', 'Suíte com closet', 'Rua tranquila', 'Esquina', 'Energia solar', 'Pronto para morar', 'Alto padrão', 'Ótima localização'],
+  perto: ['Escolas', 'Mercado', 'Praia', 'Centro', 'Hospital', 'Rodovia', 'Praça', 'Universidade', 'Comércio'],
+  perfil: ['Família com filhos', 'Casal', 'Investidor', 'Primeiro imóvel', 'Aposentados', 'Empresa'],
+};
+
+let F = null, passo = 0;
+function campo(k, label, ph = '', tipo = 'text', dica = '') {
+  return `<div class="q"><label>${label}</label><input data-k="${k}" type="${tipo}" placeholder="${esc(ph)}" value="${esc(F[k])}">${dica ? `<div class="dica">${dica}</div>` : ''}</div>`;
+}
+function escolha(k, label, ops) {
+  return `<div class="q"><label>${label}</label><select data-k="${k}"><option value="">Selecione</option>${ops.map(([v, t]) => `<option value="${v}" ${F[k] === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
+}
+function chips(k, label, ops, max, dica = '') {
+  const um = max === 1;
+  return `<div class="q"><label>${label}</label><div class="chips">${ops.map(o => {
+    const on = um ? F[k] === o : F[k].includes(o);
+    return `<button type="button" data-chip="${k}" data-max="${max || 0}" data-v="${esc(o)}" class="${on ? 'on' : ''}">${esc(o)}</button>`;
+  }).join('')}</div>${dica ? `<div class="dica">${dica}</div>` : ''}</div>`;
+}
+function anexo(k, nome, dica, aceita = 'application/pdf,image/*', multiplo = false) {
+  const v = F[k];
+  const tem = Array.isArray(v) ? v.length : v;
+  return `<div class="arq"><div><div class="n">${nome}</div><div class="f">${tem ? (Array.isArray(v) ? v.length + ' arquivos' : esc(v)) : dica}</div></div>
+    <div style="display:flex;gap:8px;align-items:center">${tem ? '<span class="selo verde">Anexado</span>' : ''}
+    <label class="btn">${tem ? 'Trocar' : 'Anexar'}<input type="file" data-arq="${k}" accept="${aceita}" ${multiplo ? 'multiple' : ''}></label></div></div>`;
+}
+const simNao = [['sim', 'Sim'], ['nao', 'Não']];
+
+function corpoPasso() {
+  const t = F.tipo;
+  if (passo === 0) return `
+    ${chips('tipo_btn', 'Qual o tipo do imóvel?', Object.values(TIPOS), 1)}
+    <div class="grade"><div class="q"><label>CEP do imóvel</label><input data-k="cep" id="cep" inputmode="numeric" maxlength="9" placeholder="88900-000" value="${esc(F.cep)}"><div class="dica" id="cep-info">Digite o CEP que a rua, o bairro e a cidade são preenchidos sozinhos.</div></div></div>
+    ${campo('rua', 'Rua', 'Rua das Flores')}
+    <div class="grade">${campo('numero', 'Número', '120')}${campo('compl', 'Complemento', 'Ap 302, bloco B')}</div>
+    <div class="grade">${campo('bairro', 'Bairro', 'Centro')}${campo('cidade', 'Cidade', 'Araranguá')}${campo('uf', 'UF', 'SC')}</div>
+    ${t === 'apto' || t === 'sala' ? campo('predio', 'Nome do edifício ou condomínio', 'Edifício Solar') : ''}
+    ${campo('ref', 'Pontos de referência e melhor acesso', 'Atrás da praça central, acesso pela Av. Getúlio Vargas')}
+    ${campo('codigo_imoview', 'Código do imóvel no Imoview', '4521', 'text', 'Se o imóvel já está no Imoview, coloque o código para a gente comparar. O código do CRM é criado sozinho.')}`;
+  if (passo === 1) return `
+    ${campo('venda', 'Valor de venda (R$)', '450000', 'number')}
+    <div class="grade">${t === 'apto' || t === 'sala' ? campo('condominio', 'Condomínio por mês (R$)', '450', 'number') : ''}${campo('iptu', 'IPTU por ano (R$)', '1200', 'number')}</div>
+    <div class="grade">${escolha('fin', 'Aceita financiamento?', simNao)}${escolha('perm', 'Aceita permuta?', simNao)}</div>
+    ${F.aver === 'nao' ? '<div class="dica" style="color:var(--vermelho)">Imóvel marcado como não averbado: não pode ser financiado.</div>' : ''}`;
+  if (passo === 2) {
+    if (t === 'terreno') return `
+      <div class="grade">${campo('frente', 'Frente e fundos (m)', '12', 'number')}${campo('laterais', 'Laterais (m)', '30', 'number')}</div>
+      ${campo('area', 'Área total (m²)', '360', 'number', F.frente && F.laterais ? `Terreno de ${F.frente} x ${F.laterais}. A área é calculada sozinha; corrija se for irregular.` : 'Preencha frente e laterais que a área é calculada sozinha.')}
+      ${escolha('topografia', 'Topografia', [['plano', 'Plano'], ['aclive', 'Aclive'], ['declive', 'Declive']])}
+      ${campo('zoneamento', 'Zoneamento e potencial construtivo', 'Residencial, até 2 pavimentos')}`;
+    if (t === 'sala') return `
+      <div class="grade">${campo('area', 'Área privativa (m²)', '45', 'number')}${campo('area_global', 'Área global (m²)', '60', 'number', 'Privativa + áreas comuns + garagem')}</div>
+      <div class="grade">${campo('banh', 'Banheiros', '1', 'number')}${escolha('copa', 'Tem copa?', simNao)}${escolha('divisorias', 'Tem divisórias?', [['Sim', 'Sim'], ['Não', 'Não']])}</div>
+      <div class="grade">${campo('vagas', 'Vagas de garagem', '1', 'number')}${+F.vagas > 0 ? `${escolha('vaga_tipo', 'A vaga é coberta?', [['coberta', 'Coberta'], ['descoberta', 'Descoberta'], ['ambas', 'Tem coberta e descoberta']])}` : ''}</div>
+      <div class="grade">${campo('andar', 'Andar da sala', '2', 'number')}</div>
+      <div class="q" style="margin-top:4px"><label style="font-weight:600;color:var(--texto)">Sobre o prédio</label></div>
+      <div class="grade">${campo('andares', 'Andares do prédio', '12', 'number')}${campo('unid_andar', 'Unidades por andar', '4', 'number')}${campo('elevadores', 'Elevadores', '2', 'number')}</div>
+      ${campo('usos', 'Atividades permitidas', 'Escritório, consultório, comércio')}`;
+    if (t === 'apto') return `
+      <div class="grade">${campo('area', 'Área privativa (m²)', '82', 'number')}${campo('area_global', 'Área global (m²)', '120', 'number', 'Privativa + áreas comuns + garagem')}</div>
+      <div class="grade">${campo('quartos', 'Quartos', '3', 'number')}${campo('suites', 'Suítes', '1', 'number')}${campo('banh', 'Banheiros', '2', 'number')}${campo('salas', 'Salas', '1', 'number')}</div>
+      <div class="grade">${campo('vagas', 'Vagas de garagem', '1', 'number')}${+F.vagas > 0 ? `${escolha('vaga_tipo', 'A vaga é coberta?', [['coberta', 'Coberta'], ['descoberta', 'Descoberta'], ['ambas', 'Tem coberta e descoberta']])}` : ''}</div>
+      <div class="grade">${campo('andar', 'Andar do apartamento', '3', 'number')}${escolha('posicao', 'Posição solar', [['Norte', 'Norte'], ['Sul', 'Sul'], ['Leste', 'Leste (sol da manhã)'], ['Oeste', 'Oeste (sol da tarde)']])}</div>
+      <div class="q" style="margin-top:4px"><label style="font-weight:600;color:var(--texto)">Sobre o prédio</label></div>
+      <div class="grade">${campo('andares', 'Andares do prédio', '12', 'number')}${campo('unid_andar', 'Unidades por andar', '4', 'number')}${campo('elevadores', 'Elevadores', '2', 'number')}</div>`;
+    return `
+      <div class="grade">${campo('area', 'Área construída (m²)', '120', 'number')}${campo('area_terreno', 'Área do terreno (m²)', '360', 'number')}</div>
+      <div class="grade">${campo('quartos', 'Quartos', '3', 'number')}${campo('suites', 'Suítes', '1', 'number')}${campo('banh', 'Banheiros', '2', 'number')}${campo('salas', 'Salas', '1', 'number')}</div>
+      <div class="grade">${campo('vagas', 'Vagas de garagem', '2', 'number')}${+F.vagas > 0 ? `${escolha('vaga_tipo', 'A vaga é coberta?', [['coberta', 'Coberta'], ['descoberta', 'Descoberta'], ['ambas', 'Tem coberta e descoberta']])}` : ''}</div>`;
+  }
+  if (passo === 3) {
+    if (t === 'terreno') return `
+      ${escolha('loteamento', 'Fica em loteamento fechado?', simNao)}
+      ${F.loteamento === 'sim' ? chips('lazer', 'Lazer do loteamento (marque pelo menos 3)', OPC.lazer.terreno) : ''}
+      ${chips('infra', 'Infraestrutura disponível', OPC.infra)}`;
+    return `
+      ${t !== 'sala' ? chips('lazer', t === 'apto' ? 'Lazer do condomínio (pelo menos 3)' : 'Lazer do imóvel (pelo menos 3)', OPC.lazer[t]) : ''}
+      ${chips('intr', 'Itens internos (pelo menos 3)', OPC.intr[t])}
+      ${chips('ext', t === 'casa' ? 'Itens externos (pelo menos 3)' : 'Itens do prédio (pelo menos 3)', OPC.ext[t])}`;
+  }
+  if (passo === 4) return `
+    <div class="aviso" style="background:var(--azul-claro);color:var(--azul)">Com essas respostas a IA escreve o título e a descrição do anúncio para o site, já pensando no Google. Você não precisa escrever o texto.</div>
+    ${chips('estado', 'Estado do imóvel', OPC.estado, 1)}
+    ${chips('dest', 'Destaques do imóvel (até 5)', OPC.dest, 5)}
+    ${chips('perto', 'O que tem perto', OPC.perto)}
+    ${chips('perfil', 'Ideal para', OPC.perfil)}
+    <div class="q"><label>O que mais chama atenção na visita? (1 a 2 frases)</label><textarea data-k="frase" rows="2" placeholder="Casa muito iluminada, com pátio nos fundos ótimo para churrasco">${esc(F.frase)}</textarea></div>
+    <div class="card" style="background:var(--fundo)"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-weight:600">Descrição do anúncio</b><button type="button" data-gerardesc>${F.descricao_seo ? '↻ Gerar outra versão' : '✨ Gerar descrição com IA'}</button></div>
+      <div id="desc-box">${blocoDescricao(F.descricao_seo)}</div></div>`;
+  if (passo === 5) {
+    const constr = t === 'casa' ? 'A casa' : t === 'apto' ? 'O apartamento' : 'A sala';
+    const avisoAver = F.aver === 'sim' ? '<div class="aviso" style="background:var(--verde-claro);color:var(--verde)">Averbado: o imóvel pode ser vendido com financiamento.</div>'
+      : F.aver === 'nao' ? '<div class="aviso" style="background:var(--vermelho-claro);color:var(--vermelho)">Sem averbação o banco não financia: a venda fica só à vista ou com permuta. Marcamos "Aceita financiamento: não".</div>'
+      : F.aver === 'naosei' ? '<div class="aviso" style="background:var(--ambar-claro);color:var(--ambar)">Confira na matrícula se a construção aparece averbada. Isso define se o cliente pode financiar.</div>' : '';
+    return `
+    <div class="q"><label>Matrícula do imóvel</label>
+      <div class="grade">${campo('mat_num', 'Número da matrícula *', '12.345')}${campo('mat_cartorio', 'Cartório de registro', '1º Ofício de Araranguá')}</div>
+      ${anexo('mat_arq', 'Matrícula atualizada (PDF)', 'Não é obrigatório, mas vale ' + ITENS.find(i => i.k === 'mat').p[IDX[t]] + ' pontos. Emitida há até 30 dias.', 'application/pdf')}
+      <div class="grade" style="margin:8px 0 4px">${campo('mat_data', 'Data de emissão da matrícula', '', 'date', F.mat_data && dias(F.mat_data) > 30 ? '<span style="color:var(--vermelho)">Emitida há mais de 30 dias: peça uma nova.</span>' : '')}</div>
+    </div>
+    ${t !== 'terreno' ? `<div class="q">${escolha('aver', constr + ' está averbad' + (t === 'casa' || t === 'sala' ? 'a' : 'o') + ' na matrícula?', [['sim', 'Sim, averbado'], ['nao', 'Não ou só parte averbada'], ['naosei', 'Não sei']])}${avisoAver}${F.aver === 'sim' ? anexo('aver_arq', 'Comprovante da averbação', 'Opcional: certidão ou página da matrícula com a averbação') : ''}</div>` : ''}
+    <div class="q"><label>Documentos do proprietário</label>
+      ${anexo('cnh_arq', 'CNH ou RG e CPF do proprietário *', 'PDF ou foto')}
+      ${anexo('comp_arq', 'Comprovante de endereço do proprietário *', 'PDF ou foto')}
+      ${t === 'terreno' ? anexo('cnd_arq', 'Certidão negativa de débitos municipais', 'Opcional') : ''}
+    </div>`;
+  }
+  const minimo = t === 'terreno' ? 10 : 15;
+  const prev = (fotosSessao[F.id] || []).slice(0, 24);
+  return `
+    <div class="q"><label>Fotos do imóvel (mínimo ${minimo}${t === 'terreno' ? ': frente, laterais, fundos e entorno' : ', com fachada e todos os ambientes'})</label>
+      ${anexo('fotos', `${F.fotos.length} de ${minimo} fotos`, 'Selecione várias de uma vez', 'image/*', true)}
+      ${prev.length ? `<div class="fotos">${prev.map(u => `<div style="background-image:url(${u})"></div>`).join('')}</div>` : (F.fotos.length ? `<div class="fotos">${F.fotos.slice(0, 12).map(n => `<div>${esc(n)}</div>`).join('')}</div>` : '')}
+      ${t !== 'terreno' ? `<label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:14px"><input type="checkbox" data-b="fachada" ${F.fachada ? 'checked' : ''} style="width:auto"> As fotos incluem a fachada e todos os ambientes</label>` : ''}
+      <div class="dica">As fotos ficam guardadas para irem para o site depois.</div>
+    </div>
+    <div class="q"><label>Divulgação</label>
+      ${anexo('placa_arq', 'Foto da placa instalada', 'Foto tirada no local, com data', 'image/*')}
+      ${t === 'apto' || t === 'sala' ? anexo('placa_proib_arq', 'Condomínio proíbe placa?', 'Anexe o regimento ou comunicado (conta a placa cheia)') : ''}
+      ${t === 'terreno' ? anexo('drone_arq', 'Foto aérea ou de drone', 'Opcional', 'image/*') : ''}
+    </div>
+    ${campo('video', t === 'terreno' ? 'Link do vídeo ou drone' : 'Link do vídeo ou tour 360', 'https://youtu.be/...')}
+    ${t !== 'terreno' ? `<label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" data-b="chave" ${F.chave ? 'checked' : ''} style="width:auto"> A chave ficou na imobiliária</label>` : ''}`;
+}
+
+function blocoDescricao(dsc) {
+  if (!dsc) return '<div class="dica" style="margin-top:6px">Responda as perguntas acima e clique para a IA escrever o título e o texto do anúncio.</div>';
+  return `<div style="margin-top:8px;font-size:14px">
+    <div class="dica">Título do Google (${(dsc.titulo_google || '').length}/60)</div><div style="font-weight:600">${esc(dsc.titulo_google)}</div>
+    <div class="dica" style="margin-top:6px">Meta description (${(dsc.meta_description || '').length}/155)</div><div>${esc(dsc.meta_description)}</div>
+    <div class="dica" style="margin-top:6px">Palavra-chave: ${esc(dsc.palavra_chave)}${dsc.long_tails?.length ? ' · ' + dsc.long_tails.map(esc).join(' · ') : ''}</div>
+    <h3 style="font-size:16px;margin:10px 0 4px">${esc(dsc.h1)}</h3>
+    ${(dsc.secoes || []).map(x => `<div style="font-weight:600;margin-top:6px">${esc(x.h2)}</div><div style="line-height:1.6">${esc(x.texto)}</div>`).join('')}</div>`;
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-gerardesc]'); if (!b || !F) return;
+  const box = document.getElementById('desc-box');
+  const dados = {}; for (const k of ['tipo', 'bairro', 'cidade', 'uf', 'ref', 'predio', 'venda', 'fin', 'perm', 'area', 'area_global', 'area_terreno', 'medidas', 'quartos', 'suites', 'banh', 'salas', 'vagas', 'vaga_tipo', 'andar', 'andares', 'elevadores', 'posicao', 'topografia', 'zoneamento', 'usos', 'lazer', 'intr', 'ext', 'infra', 'estado', 'dest', 'perto', 'perfil', 'frase', 'aver']) if (!vazio(F[k]) && !(Array.isArray(F[k]) && !F[k].length)) dados[k] = F[k];
+  dados.tipo = TIPOS[F.tipo] || F.tipo;
+  b.disabled = true; box.innerHTML = '<div class="dica" style="margin-top:6px">Escrevendo a descrição… (leva alguns segundos)</div>';
+  const { data, error } = await db.functions.invoke('crm-vendas-descricao', { body: { dados } });
+  b.disabled = false;
+  let msg = data?.erro;
+  if (error) { try { msg = (await error.context.json()).erro; } catch (_) { msg = 'Não foi possível gerar agora.'; } }
+  if (msg || !data?.descricao) { box.innerHTML = `<div class="erro" style="margin-top:6px">${esc(msg || 'Não foi possível gerar agora.')}</div>${F.descricao_seo ? blocoDescricao(F.descricao_seo) : ''}`; return; }
+  F.descricao_seo = data.descricao; box.innerHTML = blocoDescricao(F.descricao_seo); b.textContent = '↻ Gerar outra versão';
+  aviso('Descrição gerada. Ela é salva junto com o cadastro.');
+});
+function placar(d) {
+  const { total, obr, obrMax, completo, linhas } = pontuar(d);
+  const fx = faixa(total, completo);
+  return `<div class="card placar">
+    <div class="grande"><small style="color:var(--suave)">Nota do imóvel</small><b>${total}</b></div>
+    <div class="trilho"><div style="width:${total}%"></div></div>
+    <div style="text-align:center"><span class="selo ${fx.c}">${fx.t}</span></div>
+    <div style="text-align:center;font-size:12px;color:var(--suave);margin-top:6px">Obrigatórios: ${obr} de ${obrMax}</div>
+    <div class="itens">${d.tipo ? linhas.map(l => `<div class="${l.ok ? 'ok' : ''} ${l.dep ? 'dep' : ''}"><span>${l.ok ? '✓ ' : ''}${l.l}${l.o ? ' *' : ''}${l.dep ? ' (todo mês)' : ''}</span><span>${l.pts}</span></div>`).join('') : '<div>Escolha o tipo do imóvel para ver a pontuação.</div>'}</div>
+    <div style="font-size:11px;color:var(--suave);margin-top:6px">* obrigatório para enviar</div>
+  </div>`;
+}
+
+function telaForm() {
+  const devolvido = F.status === 'devolvido' && F.obs_devolucao;
+  return `
+    <div style="margin-bottom:10px"><button data-voltar>← Voltar para imóveis</button></div>
+    ${devolvido ? `<div class="aviso" style="background:var(--destaque-claro);color:var(--destaque)"><b>Devolvido pelo gestor:</b> ${esc(F.obs_devolucao)}</div>` : ''}
+    <div class="form">
+      <div class="card">
+        <div class="passos">${PASSOS.map((_, i) => `<div data-ir="${i}" class="${i <= passo ? 'on' : ''}" title="${PASSOS[i]}"></div>`).join('')}</div>
+        <div class="ptit">Etapa ${passo + 1} de ${PASSOS.length}</div>
+        <h2>${PASSOS[passo]}</h2>
+        <div id="corpo">${corpoPasso()}</div>
+        <div class="erro" id="erro"></div>
+        <div class="nav">
+          <div style="display:flex;gap:8px">${passo > 0 ? '<button data-ant>Voltar</button>' : ''}<button data-rasc>Salvar rascunho</button></div>
+          ${passo < PASSOS.length - 1 ? '<button class="principal" data-prox>Próxima</button>' : '<button class="principal" data-enviar>Enviar para aprovação</button>'}
+        </div>
+      </div>
+      <div id="placar">${placar(F)}</div>
+    </div>`;
+}
+function atualizarPlacar() { const p = document.getElementById('placar'); if (p) p.innerHTML = placar(F); }
+function abrirForm(im) { F = JSON.parse(JSON.stringify(im)); passo = 0; tela = { nome: 'form' }; render(); }
+async function gravarF(status) {
+  const antes = F.status;
+  if (status) F.status = status;
+  const linha = paraLinha(F);
+  const existe = DB.imoveis.some(i => i.id === F.id);
+  const q = existe ? db.from('crm_vendas_imoveis').update(linha).eq('id', F.id) : db.from('crm_vendas_imoveis').insert(linha);
+  const { data, error } = await q.select().single();
+  if (error) { F.status = antes; document.getElementById('erro').textContent = 'Não foi possível salvar: ' + error.message; return null; }
+  F.codigo = data.codigo;
+  await carregar();
+  return data;
+}
+
+// ---------- detalhe ----------
+function telaDetalhe() {
+  const im = DB.imoveis.find(i => i.id === tela.id);
+  if (!im) { tela = { nome: 'lista' }; return telaLista(); }
+  const st = STATUS[im.status];
+  const at = situacaoAtualizacao(im);
+  const podeEditar = !gestor() && im.corretor === usuario && (im.status === 'rascunho' || im.status === 'devolvido');
+  const L = (a, b) => vazio(b) || (Array.isArray(b) && !b.length) ? '' : `<div class="linha"><span>${a}</span><span>${esc(Array.isArray(b) ? b.join(', ') : b)}</span></div>`;
+  const doc = (n, v, k) => `<div class="linha"><span>${n}</span><span>${v ? `<span class="selo verde">${esc(v)}</span>${im.arqs && im.arqs[k] ? ` <button class="link" data-verarq="${esc(im.arqs[k])}">abrir</button>` : ''}` : '<span class="selo vermelho">Falta</span>'}</span></div>`;
+  return `
+    <div style="margin-bottom:10px"><button data-voltar>← Voltar</button></div>
+    <div class="det">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start">
+          <div><h2 style="margin:0">${esc(TIPOS[im.tipo] || 'Imóvel')} · ${esc(im.bairro)}</h2>
+          <div style="color:var(--suave);font-size:14px">${esc(im.end)}, ${esc(im.cidade)}${im.uf ? '/' + esc(im.uf) : ''}${im.cep ? ' · CEP ' + esc(im.cep) : ''} · ${codigoTxt(im)}${im.codigo_imoview ? ' · Imoview ' + esc(im.codigo_imoview) : ''} · ${esc(CORRETORES[im.corretor] || '')}</div>
+          <div class="selos" style="margin-top:6px"><span class="selo ${st.c}">${st.t}</span>${at ? `<span class="selo ${at.c}">${at.t}</span>` : ''}</div></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${podeEditar ? `<button class="principal" data-editar="${im.id}">${im.status === 'devolvido' ? 'Ajustar e reenviar' : 'Continuar cadastro'}</button>` : ''}
+            ${im.status === 'ativo' && (gestor() || im.corretor === usuario) ? `<button data-atualizei="${im.id}">Registrar atualização com o proprietário</button>` : ''}
+          </div>
+        </div>
+        ${im.status === 'devolvido' && im.obs_devolucao ? `<div class="aviso" style="background:var(--destaque-claro);color:var(--destaque);margin-top:12px"><b>Motivo da devolução:</b> ${esc(im.obs_devolucao)}</div>` : ''}
+        ${at && at.n >= 61 ? `<div class="aviso" style="background:var(--vermelho-claro);color:var(--vermelho);margin-top:12px">Passou de 60 dias sem atualização: pela regra, a posse deste agenciamento passa para outro corretor.</div>` : ''}
+        <div class="bloco" style="margin-top:14px"><h3>Dados</h3>
+          ${L('Valor de venda', brl(im.venda))}${L('Condomínio', im.condominio && brl(im.condominio))}${L('IPTU por ano', im.iptu && brl(im.iptu))}
+          ${L(im.tipo === 'apto' || im.tipo === 'sala' ? 'Área privativa' : 'Área', im.area && im.area + ' m²')}${L('Área global', im.area_global && im.area_global + ' m²')}${L('Terreno', im.area_terreno && im.area_terreno + ' m²')}${L('Medidas (frente x laterais)', im.medidas && im.medidas + ' m')}
+          ${L('Quartos / suítes / banheiros', [im.quartos, im.suites, im.banh].some(x => !vazio(x)) ? `${im.quartos || 0} / ${im.suites || 0} / ${im.banh || 0}` : '')}
+          ${L('Salas', im.salas)}${L('Vagas', vazio(im.vagas) ? '' : im.vagas + ({ coberta: ' (coberta)', descoberta: ' (descoberta)', ambas: ' (coberta e descoberta)' }[im.vaga_tipo] || ''))}${L('Andar', im.andar)}${L('Andares do prédio', im.andares)}${L('Unidades por andar', im.unid_andar)}${L('Elevadores', im.elevadores)}${L('Posição solar', im.posicao)}${L('Topografia', im.topografia)}${L('Zoneamento', im.zoneamento)}${L('Atividades permitidas', im.usos)}
+          ${L('Financiamento / permuta', im.fin ? `${im.fin === 'sim' ? 'Aceita' : 'Não aceita'} / ${im.perm === 'sim' ? 'Aceita' : 'Não aceita'}` : '')}
+          ${L('Lazer', im.lazer)}${L('Itens internos', im.intr)}${L('Itens externos', im.ext)}${L('Infraestrutura', im.infra)}
+        </div>
+        <div class="bloco"><h3>Para a descrição do anúncio</h3>
+          ${L('Estado', im.estado)}${L('Destaques', im.dest)}${L('Perto de', im.perto)}${L('Ideal para', im.perfil)}${L('Na visita', im.frase)}
+          ${im.descricao_seo ? `<div class="card" style="background:var(--fundo);margin-top:8px"><b style="font-weight:600">Descrição do anúncio (IA)</b>${blocoDescricao(im.descricao_seo)}</div>` : '<div class="dica" style="font-size:12px;color:var(--suave);margin-top:6px">Descrição com IA ainda não gerada (botão na etapa "Sobre o imóvel" do cadastro).</div>'}
+        </div>
+        <div class="bloco"><h3>Documentos</h3>
+          ${L('Número da matrícula', im.mat_num)}${L('Cartório', im.mat_cartorio)}${doc('PDF da matrícula' + (im.mat_data ? ` (emitida há ${dias(im.mat_data)} dias)` : ''), im.mat_arq, 'mat_arq')}${doc('CNH / RG e CPF', im.cnh_arq, 'cnh_arq')}${doc('Comprovante de endereço', im.comp_arq, 'comp_arq')}
+          ${im.tipo !== 'terreno' ? `<div class="linha"><span>Averbação</span><span>${im.aver === 'sim' ? '<span class="selo verde">Averbado · pode financiar</span>' : im.aver === 'nao' ? '<span class="selo vermelho">Não averbado · sem financiamento</span>' : '<span class="selo ambar">Não informado</span>'}</span></div>` : ''}
+        </div>
+        <div class="bloco"><h3>Fotos e divulgação</h3>
+          ${L('Fotos', im.fotos.length + ' fotos')}<div class="fotos" id="fotos-det"></div>${L('Placa', im.placa_arq ? 'Instalada (foto anexada)' : (im.placa_proib_arq ? 'Condomínio proíbe (comprovado)' : 'Sem placa'))}${L('Vídeo ou tour', im.video)}${L('Chave na imobiliária', im.chave ? 'Sim' : '')}
+        </div>
+        ${gestor() && im.status === 'aguardando' ? `
+        <div class="card" style="background:var(--fundo)">
+          <h3 style="margin:0 0 8px;font-size:15px">Sua decisão</h3>
+          <textarea id="obs" rows="2" placeholder="Observação (obrigatória para devolver): ex. falta foto da cozinha"></textarea>
+          <div class="erro" id="erro"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="principal" data-aprovar="${im.id}">Aprovar agenciamento</button><button data-devolver="${im.id}">Devolver para o corretor</button></div>
+        </div>` : ''}
+        <div class="bloco" style="margin-top:14px" id="hist"></div>
+      </div>
+      <div>${placar(im)}</div>
+    </div>`;
+}
+
+async function extrasDetalhe(id) {
+  const im = DB.imoveis.find(i => i.id === id); if (!im) return;
+  const { data: h } = await db.from('crm_vendas_imoveis_historico').select('quando, texto').eq('imovel_id', id).order('quando', { ascending: false });
+  const el = document.getElementById('hist');
+  if (el && h && h.length) el.innerHTML = '<h3>Histórico</h3>' + h.map(x => `<div class="linha"><span>${new Date(x.quando).toLocaleDateString('pt-BR')}</span><span>${esc(x.texto)}</span></div>`).join('');
+  const paths = (im.fotos_paths || []).slice(0, 12);
+  if (paths.length) {
+    const { data: urls } = await db.storage.from('crm-vendas').createSignedUrls(paths, 3600);
+    const box = document.getElementById('fotos-det');
+    if (box && urls) box.innerHTML = urls.filter(u => u.signedUrl).map(u => `<div style="background-image:url('${u.signedUrl}')"></div>`).join('');
+  }
+}
+
+// ---------- eventos ----------
+
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.id === 'busca') { filtro.busca = t.value; const pos = t.selectionStart; render(); const b = document.getElementById('busca'); b.focus(); b.setSelectionRange(pos, pos); return; }
+  if (tela.nome === 'form' && t.dataset.k) {
+    if (t.dataset.k === 'cep') { const dg = t.value.replace(/\D/g, '').slice(0, 8); t.value = dg.length > 5 ? dg.slice(0, 5) + '-' + dg.slice(5) : dg; }
+    F[t.dataset.k] = t.value;
+    if (['rua', 'numero', 'compl', 'cep'].includes(t.dataset.k)) F.end = [F.rua, F.numero, F.compl].filter(Boolean).join(', ');
+    if (t.dataset.k === 'cep') buscarCep(t.value);
+    if (t.dataset.k === 'area') F.area_auto = false;
+    if (t.dataset.k === 'frente' || t.dataset.k === 'laterais') {
+      F.medidas = F.frente && F.laterais ? `${F.frente} x ${F.laterais}` : '';
+      if (F.area_auto || vazio(F.area)) {
+        F.area_auto = true;
+        F.area = F.frente && F.laterais ? String(Math.round(+F.frente * +F.laterais * 100) / 100) : '';
+        const a = document.querySelector('[data-k="area"]'); if (a) a.value = F.area;
+      }
+      const dica = document.querySelector('[data-k="area"]')?.parentElement.querySelector('.dica');
+      if (dica) dica.textContent = F.medidas ? `Terreno de ${F.medidas}. A área é calculada sozinha; corrija se for irregular.` : 'Preencha frente e laterais que a área é calculada sozinha.';
+    }
+    if (t.dataset.k === 'vagas') { const tinha = !!document.querySelector('[data-k="vaga_tipo"]'); if (tinha !== (+t.value > 0)) { document.getElementById('corpo').innerHTML = corpoPasso(); const v = document.querySelector('[data-k="vagas"]'); v.focus(); } }
+    document.getElementById('erro').textContent = '';
+    atualizarPlacar();
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'fstatus') { filtro.status = t.value; render(); return; }
+  if (tela.nome !== 'form') return;
+  if (t.tagName === 'SELECT' && t.dataset.k) { F[t.dataset.k] = t.value;
+    if (t.dataset.k === 'aver') { if (t.value === 'nao') F.fin = 'nao'; document.getElementById('corpo').innerHTML = corpoPasso(); } if (t.dataset.k === 'mat_data' || t.dataset.k === 'loteamento') document.getElementById('corpo').innerHTML = corpoPasso(); atualizarPlacar(); }
+  if (t.type === 'date') { document.getElementById('corpo').innerHTML = corpoPasso(); }
+  if (t.dataset.b) { F[t.dataset.b] = t.checked; atualizarPlacar(); }
+  if (t.dataset.arq && t.files.length) enviarArquivos(t.dataset.arq, [...t.files]);
+});
+
+// Ao completar o CEP, busca rua, bairro, cidade e UF no ViaCEP (serviço público e gratuito), igual ao sistema de locação.
+let cepBuscado = '';
+async function buscarCep(valor) {
+  const cep = valor.replace(/\D/g, '');
+  const info = document.getElementById('cep-info');
+  const mostrar = (txt, erro) => { if (info) { info.textContent = txt; info.style.color = erro ? 'var(--vermelho)' : ''; } };
+  if (cep.length !== 8) { cepBuscado = ''; return; }
+  if (cep === cepBuscado) return;
+  cepBuscado = cep;
+  mostrar('Buscando endereço…');
+  try {
+    const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+    const d = await r.json();
+    if (F.cep.replace(/\D/g, '') !== cep) return;
+    if (!r.ok || d.erro) { mostrar('CEP não encontrado. Preencha o endereço à mão.', true); return; }
+    const pr = (k, v) => { if (v) { F[k] = v; const el = document.querySelector(`[data-k="${k}"]`); if (el) el.value = v; } };
+    pr('rua', d.logradouro); pr('bairro', d.bairro); pr('cidade', d.localidade); pr('uf', d.uf);
+    F.end = [F.rua, F.numero, F.compl].filter(Boolean).join(', ');
+    mostrar('Endereço encontrado. Confira e preencha o número.');
+    document.querySelector(`[data-k="${d.logradouro ? 'numero' : 'rua'}"]`)?.focus();
+    atualizarPlacar();
+  } catch (e) {
+    mostrar('Não foi possível buscar o CEP agora. Preencha o endereço à mão.', true);
+  }
+}
+
+// Sobe os arquivos para o Supabase (pasta do usuário / imóvel) e guarda o caminho no cadastro.
+async function enviarArquivos(k, arquivos) {
+  const erro = document.getElementById('erro');
+  erro.style.color = 'var(--suave)'; erro.textContent = `Enviando ${arquivos.length > 1 ? arquivos.length + ' arquivos' : 'arquivo'}…`;
+  const nomeSeguro = (n) => n.normalize('NFD').replace(/[^\w.-]+/g, '_').slice(-80);
+  let falhas = 0;
+  for (const f of arquivos) {
+    const path = `${sessao.user.id}/${F.id}/${k}-${Date.now()}-${nomeSeguro(f.name)}`;
+    const { error } = await db.storage.from('crm-vendas').upload(path, f, { contentType: f.type || undefined });
+    if (error) { falhas++; continue; }
+    if (k === 'fotos') {
+      F.fotos = F.fotos.concat(f.name); F.fotos_paths = (F.fotos_paths || []).concat(path);
+      fotosSessao[F.id] = (fotosSessao[F.id] || []).concat(URL.createObjectURL(f));
+    } else {
+      F[k] = f.name; F.arqs = { ...(F.arqs || {}), [k]: path };
+      if (k === 'aver_arq' && !F.aver) F.aver = 'sim';
+    }
+  }
+  if (tela.nome !== 'form') return;
+  document.getElementById('corpo').innerHTML = corpoPasso();
+  atualizarPlacar();
+  const e2 = document.getElementById('erro');
+  e2.style.color = ''; e2.textContent = falhas ? `${falhas} arquivo(s) não foram enviados. Use PDF ou foto de até 20 MB.` : '';
+}
+
+function validarPasso() {
+  if (passo === 0 && !F.tipo) return 'Escolha o tipo do imóvel.';
+  if (passo === 0 && (!F.cep || !F.rua || !F.numero || !F.bairro || !F.cidade)) return 'Preencha CEP, rua, número, bairro e cidade.';
+  if (passo === 1 && !(+F.venda > 0)) return 'Informe o valor de venda.';
+  if (passo === 5 && !String(F.mat_num).trim()) return 'Informe o número da matrícula para continuar.';
+  return '';
+}
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('button, [data-abrir], [data-ir]');
+  if (!b) return;
+  const ds = b.dataset;
+  if (ds.aba) { tela = { nome: ds.aba }; if (ds.aba === 'painel') PNL.dados = null; if (ds.aba === 'ativ') ATV.carregado = false; if (ds.aba === 'pontos') PTS.carregado = false; if (ds.aba === 'comissao') COM.carregado = false; render(); }
+  else if (ds.abrir) { tela = { nome: 'det', id: ds.abrir }; render(); }
+  else if (ds.voltar !== undefined) { tela = { nome: gestor() && tela.nome === 'det' && DB.imoveis.find(i => i.id === tela.id)?.status === 'aguardando' ? 'aprovacao' : 'lista' }; render(); }
+  else if (ds.novo !== undefined) abrirForm(novoImovel(usuario));
+  else if (ds.editar) abrirForm(DB.imoveis.find(i => i.id === ds.editar));
+  else if (ds.chip) {
+    const k = ds.chip, v = ds.v, max = +ds.max;
+    if (k === 'tipo_btn') {
+      const novo = Object.keys(TIPOS).find(x => TIPOS[x] === v);
+      F.tipo = novo;
+      render();
+      return;
+    }
+    if (max === 1) F[k] = F[k] === v ? '' : v;
+    else if (F[k].includes(v)) F[k] = F[k].filter(x => x !== v);
+    else if (!max || F[k].length < max) F[k] = F[k].concat(v);
+    else { document.getElementById('erro').textContent = `Escolha no máximo ${max}.`; return; }
+    document.getElementById('erro').textContent = '';
+    b.classList.toggle('on', max === 1 ? F[k] === v : F[k].includes(v));
+    if (max === 1) b.parentElement.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.v === F[k]));
+    atualizarPlacar();
+  }
+  else if (ds.ir !== undefined) { const alvo = +ds.ir; if (alvo > passo && validarPasso()) { document.getElementById('erro').textContent = validarPasso(); return; } passo = alvo; render(); }
+  else if (ds.prox !== undefined) { const er = validarPasso(); if (er) { document.getElementById('erro').textContent = er; return; } passo++; render(); }
+  else if (ds.ant !== undefined) { passo--; render(); }
+  else if (ds.rasc !== undefined) {
+    if (!F.tipo) { document.getElementById('erro').textContent = 'Escolha pelo menos o tipo do imóvel para salvar.'; return; }
+    gravarF(F.status === 'devolvido' ? 'devolvido' : 'rascunho').then(ok => { if (ok) { aviso('Rascunho salvo.'); tela = { nome: 'lista' }; render(); } });
+  }
+  else if (ds.enviar !== undefined) {
+    const { completo, linhas } = pontuar(F);
+    if (!completo || !F.mat_num) {
+      const faltam = (F.mat_num ? [] : ['número da matrícula']).concat(linhas.filter(l => l.o && !l.ok).map(l => l.l.toLowerCase()));
+      document.getElementById('erro').textContent = 'Para enviar, falta: ' + faltam.join(', ') + '.';
+      return;
+    }
+    b.disabled = true;
+    gravarF('aguardando').then(ok => { b.disabled = false; if (ok) { tela = modoLink ? { nome: 'enviado', id: F.id } : { nome: 'det', id: F.id }; render(); } });
+  }
+  else if (ds.aprovar || ds.devolver) {
+    const obs = document.getElementById('obs').value.trim();
+    if (ds.devolver && !obs) { document.getElementById('erro').textContent = 'Escreva o que o corretor precisa ajustar.'; return; }
+    const fn = ds.aprovar ? 'crm_vendas_aprovar' : 'crm_vendas_devolver';
+    db.rpc(fn, { p_imovel: ds.aprovar || ds.devolver, p_obs: obs || null }).then(async ({ error }) => {
+      if (error) { document.getElementById('erro').textContent = error.message; return; }
+      aviso(ds.aprovar ? 'Agenciamento aprovado.' : 'Devolvido para o corretor.');
+      await carregar(); tela = { nome: 'aprovacao' }; render();
+    });
+  }
+  else if (ds.atualizei) {
+    db.rpc('crm_vendas_registrar_atualizacao', { p_imovel: ds.atualizei }).then(async ({ error }) => {
+      if (error) { aviso(error.message, true); return; }
+      aviso('Atualização registrada.'); await carregar(); render();
+    });
+  }
+  else if (ds.verarq) {
+    db.storage.from('crm-vendas').createSignedUrl(ds.verarq, 600).then(({ data, error }) => {
+      if (error || !data) { aviso('Não foi possível abrir o arquivo.', true); return; }
+      window.open(data.signedUrl, '_blank');
+    });
+  }
+});
+
+// Link direto de cadastro: ...#novo abre o formulário vazio na hora
+let modoLink = location.hash === '#novo';
+function telaEnviado() {
+  const im = DB.imoveis.find(i => i.id === tela.id);
+  const { total } = pontuar(im);
+  return `<div class="card" style="max-width:520px;margin:40px auto;text-align:center">
+    <div style="font-size:40px;color:var(--verde)">✓</div>
+    <h2 style="margin:6px 0">Imóvel enviado para aprovação</h2>
+    <p style="color:var(--suave)">${codigoTxt(im)} · ${esc(TIPOS[im.tipo])} · ${esc(im.bairro)} · nota ${total}. Os pontos entram quando o gestor aprovar.</p>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px">
+      <button class="principal" data-outro>Cadastrar outro imóvel</button>
+      <button data-meus>Ver meus imóveis</button>
+    </div></div>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.outro !== undefined) abrirForm(novoImovel(usuario));
+  if (b.dataset.meus !== undefined) { modoLink = false; history.replaceState(null, '', location.pathname); tela = { nome: 'lista' }; render(); }
+});
+// ---------- funis: Pré-atendimento (SDR) e Funil de vendas (funil "Atendimento" do CRM Leads) ----------
+const FUN = { cfg: null, pre: null, sdrs: [], fases: [], status: [], leads: [], busca: '', corretor: '' };
+async function carregarFunil() {
+  const { data: cs } = await db.from('crm_vendas_config').select('chave, valor').in('chave', ['funil_vendas', 'funil_pre', 'sdrs']);
+  const c = Object.fromEntries((cs || []).map(x => [x.chave, x.valor]));
+  if (!c.funil_vendas) { aviso('Funil de vendas não configurado.', true); return; }
+  FUN.cfg = c.funil_vendas; FUN.pre = c.funil_pre || null; FUN.sdrs = c.sdrs || [];
+  const funis = [FUN.cfg.funil, FUN.pre?.funil].filter(Boolean);
+  const [f, st, ld] = await Promise.all([
+    db.from('fases').select('id, nome, ordem, funil_id').order('ordem'),
+    db.from('crm_vendas_status').select('*').eq('ativo', true).order('ordem'),
+    db.from('leads').select('id, nome, telefone, email, origem, campanha, codigo_imovel, corretor_id, fase_id, funil_id, fase_atualizada_em, valor_negociacao, created_at').in('funil_id', funis).order('fase_atualizada_em', { ascending: false }).limit(3000),
+  ]);
+  if (f.error || st.error || ld.error) { aviso('Não foi possível carregar o funil.', true); return; }
+  FUN.fases = f.data; FUN.status = st.data; FUN.leads = VER ? ld.data.filter(l => l.corretor_id === VER) : ld.data;
+  // Avisos de prazo (mesma regra que vai para a pontuação): fica o mais grave de cada lead.
+  const { data: al } = await db.rpc('crm_vendas_alertas');
+  FUN.alerta = {};
+  const peso = (a) => (a.nivel === 'vermelho' ? 10 : 0) + ({ retorno: 4, feedback: 3, followup: 2, parado: 1 }[a.tipo] || 0);
+  (al || []).forEach(a => { const atual = FUN.alerta[a.lead_id]; if (!atual || peso(a) > peso(atual)) FUN.alerta[a.lead_id] = a; });
+  const ids = FUN.leads.map(l => l.id);
+  FUN.ultimo = {};
+  const marca = (id, quando, tipo) => { const u = FUN.ultimo[id]; if (!u || new Date(quando) > new Date(u.quando)) FUN.ultimo[id] = { quando, tipo }; };
+  for (let i = 0; i < ids.length; i += 200) {
+    const parte = ids.slice(i, i + 200);
+    const [it, mv] = await Promise.all([
+      db.from('interacoes').select('lead_id, tipo, created_at').in('lead_id', parte),
+      db.from('crm_vendas_movimentos').select('lead_id, quando, extras').in('lead_id', parte),
+    ]);
+    (it.data || []).forEach(x => marca(x.lead_id, x.created_at, x.tipo));
+    (mv.data || []).forEach(x => { if (x.extras && x.extras.contato) marca(x.lead_id, x.quando, x.extras.contato); });
+  }
+}
+function alertaTxt(a) {
+  if (!a) return null;
+  const h = Math.floor(a.horas), d = Math.floor(a.horas / 24);
+  if (a.tipo === 'retorno') return a.nivel === 'vermelho' ? `Atrasado: lead novo sem retorno há ${h}h` : `Lead novo: responda em até ${Math.max(1, 24 - h)}h`;
+  if (a.tipo === 'feedback') return a.nivel === 'vermelho' ? `Atrasado: feedback da visita (${d >= 1 ? d + 'd' : h + 'h'})` : `Visita passou: registre o resultado (vence em ${Math.max(1, 24 - h)}h)`;
+  if (a.tipo === 'followup') return a.nivel === 'vermelho' ? `Atrasado: follow-up da visita (${h}h)` : `Follow-up vence em ${Math.max(1, 36 - h)}h`;
+  return a.nivel === 'vermelho' ? `Atrasado: sem contato há ${d} dias` : `Sem contato há ${d} dias: faça contato até amanhã`;
+}
+const CONTATOS = ['WhatsApp', 'Ligação', 'Visita', 'E-mail', 'Instagram', 'Presencial'];
+const iniciais = (n) => String(n || '?').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join('') || '?';
+function ultimoTxt(id) {
+  const u = (FUN.ultimo || {})[id];
+  if (!u) return { t: 'Sem contato registrado', alerta: true };
+  const ms = Date.now() - new Date(u.quando);
+  const h = Math.floor(ms / 3600000), d = Math.floor(ms / 86400000);
+  const quando = h < 1 ? 'agora há pouco' : h < 24 ? `há ${h}h` : `há ${d}d`;
+  return { t: `Último contato: ${quando} · ${u.tipo}`, alerta: d >= 2 };
+}
+const faseNome = (id) => FUN.fases.find(f => f.id === id)?.nome || '—';
+const noPre = (l) => FUN.pre && l.funil_id === FUN.pre.funil;
+const eSdr = (corretorId) => FUN.sdrs.includes(corretorId);
+// Transferir: lead do SDR (ou qualquer lead, para o gestor) em "Em atendimento" ou "Agendamento de visita".
+const podeTransferir = (l) => [FUN.cfg.atendimento, FUN.cfg.agendamento].includes(l.fase_id) && (gestor() || eSdr(l.corretor_id));
+const diasDesde = (ts) => ts ? Math.max(0, Math.floor((Date.now() - new Date(ts)) / 86400000)) : null;
+function cardLead(l) {
+  const u = ultimoTxt(l.id);
+  const a = FUN.alerta?.[l.id], at = alertaTxt(a);
+  return `<div class="kcard ${a ? (a.nivel === 'vermelho' ? 'katrasado' : 'kamarelo') : ''}" data-lead="${l.id}">
+    ${at ? `<div class="kaviso">${esc(at)}</div>` : ''}
+    <div class="ktopo"><span class="kav">${esc(iniciais(l.nome))}</span><b>${esc(l.nome || 'Sem nome')}</b></div>
+    ${l.telefone ? `<div class="ktel">☏ ${esc(l.telefone)} <button class="kcopia" data-copiar="${esc(l.telefone)}" title="Copiar telefone" aria-label="Copiar telefone">⧉</button></div>` : ''}
+    <div class="selos"><span class="selo vinho">${esc(l.origem || 'Sem origem')}</span>${l.codigo_imovel ? `<span class="selo">Cód. ${esc(l.codigo_imovel)}</span>` : ''}${l.valor_negociacao ? `<span class="selo">${brl(l.valor_negociacao)}</span>` : ''}</div>
+    ${gestor() ? `<div class="s" style="margin-top:4px">${esc(CORRETORES[l.corretor_id] || 'Sem corretor')}</div>` : ''}
+    <div class="kult ${u.alerta ? 'alerta' : ''}">${esc(u.t)}</div>
+    <button class="kmover" data-moverrapido="${l.id}">→ Mover etapa</button>
+    ${podeTransferir(l) ? `<button class="kmover ktransf" data-transferir="${l.id}">⇄ Transferir atendimento</button>` : ''}
+  </div>`;
+}
+function telaFunil(modo) {
+  if (!FUN.cfg) return '<div class="vazio">Carregando o funil…</div>';
+  const pre = modo === 'pre';
+  if (pre && !FUN.pre) return '<div class="vazio">Funil de pré-atendimento não configurado.</div>';
+  const funilId = pre ? FUN.pre.funil : FUN.cfg.funil;
+  const fasesFunil = FUN.fases.filter(f => f.funil_id === funilId);
+  const q = FUN.busca.toLowerCase().replace(/\D/g, '') || FUN.busca.toLowerCase();
+  const filtrados = FUN.leads.filter(l => l.funil_id === funilId && (!FUN.soAtrasados || FUN.alerta?.[l.id]?.nivel === 'vermelho') && (!FUN.corretor || l.corretor_id === FUN.corretor) &&
+    (!FUN.busca || [l.nome, l.telefone, l.codigo_imovel, l.origem].join(' ').toLowerCase().includes(FUN.busca.toLowerCase()) || (q && String(l.telefone || '').replace(/\D/g, '').includes(q))));
+  const col = (f, sub) => { const ls = filtrados.filter(l => l.fase_id === f.id);
+    const nAtr = ls.filter(l => FUN.alerta?.[l.id]?.nivel === 'vermelho').length;
+    return `<div class="kcol"><div class="khead"><span>${esc(f.nome)}</span><span style="color:var(--suave)">${ls.length}${nAtr ? ` · <span style="color:var(--vermelho)">${nAtr} atrasado${nAtr > 1 ? 's' : ''}</span>` : ''}</span></div>${ls.slice(0, 80).map(cardLead).join('')}${ls.length > 80 ? `<div class="s" style="text-align:center">+${ls.length - 80} leads</div>` : ''}</div>`; };
+  const c = FUN.cfg;
+  let html = '';
+  for (const f of fasesFunil) {
+    if (f.id === c.noshow) continue;
+    if (f.id === c.visita) {
+      const fv = f, fn = FUN.fases.find(x => x.id === c.noshow);
+      const n = filtrados.filter(l => l.fase_id === fv.id || l.fase_id === fn?.id).length;
+      html += `<div class="kgrp"><div class="khead"><span>Visita</span><span style="color:var(--suave)">${n}</span></div><div class="sub">${col(fv)}${fn ? col(fn) : ''}</div></div>`;
+    } else html += col(f);
+  }
+  const corrs = [...new Set(FUN.leads.map(l => l.corretor_id).filter(Boolean))].map(id => [id, CORRETORES[id] || 'Sem nome']).sort((a, b) => a[1].localeCompare(b[1]));
+  return `<div class="barra">
+      <input id="fbusca" placeholder="Buscar nome, telefone ou código" value="${esc(FUN.busca)}">
+      <button data-soatrasados class="${FUN.soAtrasados ? 'principal' : ''}">${FUN.soAtrasados ? '✓ ' : ''}Só atrasados (${FUN.leads.filter(l => l.funil_id === funilId && FUN.alerta?.[l.id]?.nivel === 'vermelho').length})</button>
+      ${gestor() ? `<select id="fcorretor"><option value="">Todos os corretores</option>${corrs.map(([id, n]) => `<option value="${id}" ${FUN.corretor === id ? 'selected' : ''}>${esc(n)}${eSdr(id) ? ' (SDR)' : ''}${(() => { const k = FUN.leads.filter(l => l.funil_id === funilId && l.corretor_id === id && FUN.alerta?.[l.id]?.nivel === 'vermelho').length; return k ? ` · ${k} atrasados` : ''; })()}</option>`).join('')}</select>` : ''}
+      ${pre ? `<span class="s" style="margin-left:auto;color:var(--suave)">${FUN.sdrs.length ? 'Pré-atendimento do SDR' : 'Ainda sem SDR: cada corretor faz o pré-atendimento dos próprios leads'}</span>` : '<button class="principal" data-novolead style="margin-left:auto">+ Novo lead</button>'}
+    </div>
+    <div class="kanban">${html}</div>`;
+}
+function telaLead() {
+  const l = FUN.leads.find(x => x.id === tela.id);
+  if (!l) return '<div class="vazio">Lead não encontrado.</div>';
+  const atual = l.fase_id;
+  const grupos = FUN.fases.filter(f => f.id !== atual && FUN.status.some(s => s.fase_id === f.id));
+  const tel = String(l.telefone || '').replace(/\D/g, '');
+  return `<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap"><button data-voltarfunil>← Voltar para o ${noPre(l) ? 'pré-atendimento' : 'funil'}</button>${podeTransferir(l) ? `<button data-transferir="${l.id}">⇄ Transferir atendimento</button>` : ''}</div>
+  <div class="det">
+    <div class="card">
+      <h2 style="margin:0">${esc(l.nome || 'Sem nome')}</h2>
+      ${FUN.alerta?.[l.id] ? `<div class="aviso" style="margin:8px 0;background:${FUN.alerta[l.id].nivel === 'vermelho' ? 'var(--vermelho-claro);color:var(--vermelho)' : 'var(--ambar-claro);color:var(--ambar)'}"><b>${esc(alertaTxt(FUN.alerta[l.id]))}</b></div>` : ''}
+      <div style="color:var(--suave);font-size:14px">${noPre(l) ? 'Pré-atendimento' : 'Funil de vendas'} · hoje em <b>${esc(faseNome(atual))}</b> · ${esc(CORRETORES[l.corretor_id] || 'Sem corretor')}${eSdr(l.corretor_id) ? ' (SDR)' : ''}</div>
+      <div class="bloco" style="margin-top:12px">
+        <div class="linha"><span>Telefone</span><span>${esc(l.telefone || '—')}${tel ? ` · <a href="https://wa.me/${tel.length <= 11 ? '55' + tel : tel}" target="_blank" style="color:var(--azul)">WhatsApp</a>` : ''}</span></div>
+        <div class="linha"><span>Origem</span><span>${esc(l.origem || '—')}${l.campanha ? ' · ' + esc(l.campanha) : ''}</span></div>
+        <div class="linha"><span>Imóvel</span><span>${l.codigo_imovel ? 'Cód. ' + esc(l.codigo_imovel) : '—'}</span></div>
+        ${l.valor_negociacao ? `<div class="linha"><span>Valor em negociação</span><span>${brl(l.valor_negociacao)}</span></div>` : ''}
+        <div class="linha"><span>Entrou no CRM</span><span>${new Date(l.created_at).toLocaleDateString('pt-BR')}</span></div>
+      </div>
+      <div class="bloco" id="hist-lead"><h3>Histórico</h3><div class="s" style="color:var(--suave)">Carregando…</div></div>
+    </div>
+    <div class="card">
+      <h2 style="font-size:16px;margin:0 0 10px">Mover lead</h2>
+      ${formMover(l)}
+      <button class="principal" data-mover="${l.id}" style="width:100%">Confirmar</button>
+    </div>
+  </div>`;
+}
+function statusPossiveis(l) {
+  const pre = noPre(l);
+  const atual = FUN.fases.find(f => f.id === l.fase_id);
+  return FUN.status.filter(s => {
+    if (pre ? s.origem === 'vendas' : s.origem === 'pre') return false;
+    if (s.tipo === 'contato') return true;
+    if (s.fase_id === l.fase_id) return false;
+    if (s.tipo === 'contato_feito') { const f = FUN.fases.find(x => x.id === s.fase_id); return f && atual && f.ordem === atual.ordem + 1; }
+    return true;
+  });
+}
+function formMover(l) {
+  const sts = statusPossiveis(l);
+  const ordemFunil = (f) => (FUN.pre && f.funil_id === FUN.pre.funil ? 0 : f.funil_id === FUN.cfg.funil ? 1 : 2) * 100 + f.ordem;
+  const grupos = FUN.fases.filter(f => sts.some(s => s.fase_id === f.id)).sort((a, b) => ordemFunil(a) - ordemFunil(b));
+  const nomeFase = (f) => (noPre(l) && f.funil_id === FUN.cfg.funil) ? f.nome + ' (funil de vendas)' : (FUN.pre && f.funil_id !== FUN.pre.funil && f.funil_id !== FUN.cfg.funil) ? f.nome + ' (nutrição)' : f.nome;
+  return `<div class="q"><label for="mstatus">Status *</label>
+      <select id="mstatus"><option value="">Selecione o status</option><optgroup label="Continua em ${esc(faseNome(l.fase_id))}">${sts.filter(s => s.tipo === 'contato').map(s => `<option value="${s.id}">${esc(s.nome)}</option>`).join('')}</optgroup>${grupos.map(f => `<optgroup label="${esc(nomeFase(f))}">${sts.filter(s => s.fase_id === f.id).map(s => `<option value="${s.id}">${esc(s.nome)}${s.tipo === 'perdido' || s.tipo === 'descartado' ? ' (' + esc(f.nome) + ')' : ''}</option>`).join('')}</optgroup>`).join('')}</select>
+      <div class="dica" id="mdest"></div></div>
+    <div id="mextra"></div>
+    <div class="q"><label for="mcontato">Contato feito *</label><select id="mcontato"><option value="">Como falou com o cliente?</option>${CONTATOS.map(c => `<option>${c}</option>`).join('')}</select></div>
+    <div class="q"><label for="mobs" id="mobslabel">Observação</label><textarea id="mobs" rows="3" placeholder="Resumo do atendimento"></textarea></div>
+    <div class="erro" id="merro"></div>`;
+}
+function abrirModalMover(id) {
+  const l = FUN.leads.find(x => x.id === id); if (!l) return;
+  const m = document.getElementById('modal');
+  m.innerHTML = `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h2 style="font-size:16px;margin:0">Mover lead</h2><button data-fecharmodal aria-label="Fechar">✕</button></div>
+    <div style="color:var(--suave);font-size:13px;margin-bottom:12px">${esc(l.nome || 'Sem nome')} · hoje em ${esc(faseNome(l.fase_id))}</div>
+    ${formMover(l)}
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button data-fecharmodal>Cancelar</button><button class="principal" data-mover="${l.id}">Confirmar</button></div></div>`;
+  m.hidden = false;
+  document.getElementById('mstatus').focus();
+}
+async function abrirModalTransferir(id) {
+  const l = FUN.leads.find(x => x.id === id); if (!l) return;
+  const { data: sg } = await db.rpc('crm_vendas_sugerir_corretor', { p_lead: id });
+  const sug = sg?.corretor || null, motivo = sg?.motivo, cont = sg?.contagem || {};
+  const opcoes = CORRETORES_ATIVOS.filter(c => c.id !== l.corretor_id && !eSdr(c.id));
+  const m = document.getElementById('modal');
+  m.innerHTML = `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h2 style="font-size:16px;margin:0">Transferir atendimento</h2><button data-fecharmodal aria-label="Fechar">✕</button></div>
+    <div style="color:var(--suave);font-size:13px;margin-bottom:12px">${esc(l.nome || 'Sem nome')} · ${esc(faseNome(l.fase_id))} · hoje com ${esc(CORRETORES[l.corretor_id] || 'ninguém')}</div>
+    <div class="q"><label for="tcor">Para qual corretor? *</label><select id="tcor"><option value="">Selecione o corretor</option>${opcoes.map(c => `<option value="${c.id}" ${c.id === sug ? 'selected' : ''}>${esc(c.nome)}${c.id === sug ? (motivo === 'agenciador' ? ' (agenciador do imóvel)' : ' (próximo da roleta)') : ''}${motivo === 'roleta' && c.id in cont ? ` · ${cont[c.id]} da roleta` : ''}</option>`).join('')}</select>
+      ${motivo === 'agenciador' ? '<div class="dica">Sugestão: quem agenciou o imóvel Cód. ' + esc(l.codigo_imovel) + '.</div>' : motivo === 'roleta' ? '<div class="dica">Sem imóvel agenciado: a roleta sugere quem recebeu menos leads até agora, para todos receberem igual.</div>' : ''}</div>
+    <div class="q"><label for="tobs">Observação</label><textarea id="tobs" rows="2" placeholder="Recado para o corretor: o que o cliente procura, horário da visita…"></textarea></div>
+    <div class="erro" id="terro"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button data-fecharmodal>Cancelar</button><button class="principal" data-confirmartransf="${l.id}">Transferir</button></div></div>`;
+  m.hidden = false;
+}
+const fecharModal = () => { const m = document.getElementById('modal'); m.hidden = true; m.innerHTML = ''; };
+function extrasMover(tipo) {
+  if (tipo === 'agendamento') return `<div class="grade"><div class="q"><label>Data e hora da visita *</label><input type="datetime-local" id="x_data"></div><div class="q"><label>Código do imóvel</label><input id="x_cod" placeholder="1001"></div></div>`;
+  if (tipo === 'proposta') return `<div class="grade"><div class="q"><label>Valor da proposta (R$) *</label><input type="number" id="x_valor"></div><div class="q"><label>Forma de pagamento</label><select id="x_pag"><option>Financiamento</option><option>À vista</option><option>Permuta</option><option>Misto</option></select></div></div>`;
+  if (tipo === 'venda') return `<div class="grade"><div class="q"><label>Tipo de venda *</label><select id="x_tipo"><option value="terceiro">Imóvel de terceiro</option><option value="incorporadora">Incorporadora</option><option value="construcao">Construção Projetar</option></select></div><div class="q"><label>Origem</label><select id="x_origem"><option value="sdr">Lead do SDR / imobiliária</option><option value="prospeccao">Prospecção do corretor</option><option value="indicacao">Indicação</option></select></div></div>
+    <div class="grade"><div class="q"><label>Valor da venda (R$) *</label><input type="number" id="x_valor"></div><div class="q"><label>Honorário (%) *</label><input type="number" step="0.1" id="x_hon"></div><div class="q"><label>Venda dividida?</label><select id="x_div"><option value="nao">Não</option><option value="sim">Sim, com outro corretor</option></select></div></div>
+    <div class="q"><label>Dividida com (se dividida)</label><select id="x_parceiro"><option value="">—</option>${CORRETORES_ATIVOS.filter(c => c.id !== usuario && !eSdr(c.id)).map(c => `<option value="${c.id}">${esc(c.nome)}</option>`).join('')}</select></div>
+    <div class="q"><label>Código do imóvel vendido</label><input id="x_cod" placeholder="1001"></div>`;
+  return '';
+}
+async function historicoLead(id) {
+  const { data } = await db.from('crm_vendas_movimentos').select('*').eq('lead_id', id).order('quando', { ascending: false });
+  const el = document.getElementById('hist-lead'); if (!el) return;
+  const extrasTxt = (x) => { const p = [];
+    if (x.data_visita) p.push('visita ' + new Date(x.data_visita).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }));
+    if (x.valor) p.push(brl(x.valor)); if (x.honorario) p.push('honorário ' + x.honorario + '%');
+    if (x.codigo_imovel) p.push('Cód. ' + x.codigo_imovel); return p.length ? ' · ' + p.join(' · ') : ''; };
+  el.innerHTML = '<h3>Histórico</h3>' + ((data || []).map(m => `<div class="hist"><b>${m.status_tipo === 'transferencia' ? 'Transferência de atendimento' : m.de_fase && m.de_fase === m.para_fase ? 'Continua em ' + esc(faseNome(m.para_fase)) : (m.de_fase ? esc(faseNome(m.de_fase)) + ' → ' : '') + esc(faseNome(m.para_fase))}</b>
+    <div style="color:var(--suave)">Status: "${esc(m.status_nome || '')}"${m.extras && m.extras.contato ? ' · ' + esc(m.extras.contato) : ''}${m.observacao ? ' · ' + esc(m.observacao) : ''}${esc(extrasTxt(m.extras || {}))}</div>
+    <div style="color:var(--suave);font-size:12px">${new Date(m.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</div></div>`).join('') || '<div style="color:var(--suave);font-size:14px">Nenhuma movimentação registrada ainda. As mudanças de etapa feitas a partir de agora aparecem aqui.</div>');
+}
+function telaNovoLead() {
+  const corrs = Object.entries(CORRETORES).sort((a, b) => a[1].localeCompare(b[1]));
+  return `<div style="margin-bottom:10px"><button data-voltarfunil>← Voltar para o funil</button></div>
+  <div class="card" style="max-width:560px">
+    <h2>Novo lead</h2>
+    <div class="grade"><div class="q"><label>Nome *</label><input id="n_nome"></div><div class="q"><label>WhatsApp *</label><input id="n_tel" inputmode="tel" placeholder="(48) 99999-0000"></div></div>
+    <div class="grade"><div class="q"><label>Origem</label><select id="n_origem"><option>Prospecção ativa</option><option>Indicação</option><option>Placa</option><option>Instagram do corretor</option><option>Cliente antigo</option><option>Outro</option></select></div><div class="q"><label>Código do imóvel (se tiver)</label><input id="n_cod" placeholder="1001"></div></div>
+    ${gestor() ? `<div class="q"><label>Corretor responsável *</label><select id="n_cor"><option value="">Selecione</option>${corrs.map(([id, n]) => `<option value="${id}">${esc(n)}</option>`).join('')}</select></div>` : ''}
+    <div class="q"><label>Observação</label><textarea id="n_obs" rows="2" placeholder="O que o cliente procura"></textarea></div>
+    <div class="erro" id="nerro"></div>
+    <button class="principal" data-salvarlead>Salvar lead</button>
+  </div>`;
+}
+document.addEventListener('change', e => {
+  if (e.target.id === 'fcorretor') { FUN.corretor = e.target.value; render(); }
+  if (e.target.id === 'mstatus') {
+    const s = FUN.status.find(x => String(x.id) === e.target.value);
+    document.getElementById('mextra').innerHTML = s ? extrasMover(s.tipo) : '';
+    document.getElementById('merro').textContent = '';
+    const lab = document.getElementById('mobslabel');
+    if (lab) lab.textContent = s && s.tipo === 'contato' ? 'Observação * (o que foi conversado)' : s && ['perdido', 'descartado'].includes(s.tipo) ? 'Observação * (o que aconteceu)' : 'Observação (opcional)';
+    if (s && s.tipo === 'contato') { document.getElementById('mdest').innerHTML = 'O lead <b>continua na mesma etapa</b>; só registra o contato.'; return; }
+    const fd = FUN.fases.find(f => f.id === s?.fase_id);
+    const extraFunil = fd && FUN.pre && tela && ((tela.nome === 'lead' && noPre(FUN.leads.find(x => x.id === tela.id) || {})) || (document.querySelector('#modal [data-mover]') && noPre(FUN.leads.find(x => x.id === document.querySelector('#modal [data-mover]').dataset.mover) || {}))) && fd.funil_id !== FUN.pre.funil ? (fd.funil_id === FUN.cfg.funil ? ' (sai do pré-atendimento e vai para o funil de vendas)' : ' (sai do pré-atendimento)') : '';
+    document.getElementById('mdest').innerHTML = s ? `Vai para <span class="selo ${['perdido', 'descartado', 'noshow_corretor'].includes(s.tipo) ? 'vermelho' : s.tipo === 'venda' ? 'verde' : 'azul'}">${esc(faseNome(s.fase_id))}</span>${extraFunil}${s.tipo === 'noshow_corretor' ? ' <span class="selo vermelho">−50 pts e 1 semana sem leads do SDR</span>' : ''}` : '';
+  }
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'fbusca') { FUN.busca = e.target.value; const pos = e.target.selectionStart; render(); const b = document.getElementById('fbusca'); b.focus(); b.setSelectionRange(pos, pos); }
+});
+document.addEventListener('click', async e => {
+  if (e.target.id === 'modal') { fecharModal(); return; }
+  if (e.target.closest('[data-soatrasados]')) { FUN.soAtrasados = !FUN.soAtrasados; render(); return; }
+  const b = e.target.closest('[data-copiar], [data-moverrapido], [data-transferir], [data-confirmartransf], [data-fecharmodal], [data-lead], [data-voltarfunil], [data-novolead], [data-mover], [data-salvarlead]');
+  if (!b) return;
+  const ds = b.dataset;
+  if (ds.copiar) { navigator.clipboard.writeText(ds.copiar).then(() => aviso('Telefone copiado.'), () => aviso('Não foi possível copiar.', true)); }
+  else if (ds.moverrapido) abrirModalMover(ds.moverrapido);
+  else if (ds.transferir) abrirModalTransferir(ds.transferir);
+  else if (ds.confirmartransf) {
+    const cor = document.getElementById('tcor').value, er = document.getElementById('terro');
+    if (!cor) { er.textContent = 'Escolha o corretor.'; return; }
+    b.disabled = true;
+    const { error } = await db.rpc('crm_vendas_transferir', { p_lead: ds.confirmartransf, p_corretor: cor, p_obs: document.getElementById('tobs').value.trim() || null });
+    b.disabled = false;
+    if (error) { er.textContent = error.message; return; }
+    aviso('Atendimento transferido para ' + (CORRETORES[cor] || 'o corretor') + '.');
+    fecharModal();
+    await carregarFunil();
+    if (tela.nome === 'lead' && !FUN.leads.some(x => x.id === tela.id)) tela = { nome: 'funil' };
+    render();
+  }
+  else if (ds.fecharmodal !== undefined) fecharModal();
+  else if (ds.lead) { tela = { nome: 'lead', id: ds.lead }; render(); }
+  else if (ds.voltarfunil !== undefined) { const l = FUN.leads.find(x => x.id === tela.id); tela = { nome: l && noPre(l) ? 'pre' : 'funil' }; render(); }
+  else if (ds.novolead !== undefined) { tela = { nome: 'novolead' }; render(); }
+  else if (ds.mover) {
+    const st = document.getElementById('mstatus').value, obs = document.getElementById('mobs').value.trim();
+    const er = document.getElementById('merro');
+    if (!st) { er.textContent = 'Escolha o status.'; return; }
+    const contato = document.getElementById('mcontato').value;
+    if (!contato) { er.textContent = 'Escolha como foi o contato com o cliente.'; return; }
+    const stObj = FUN.status.find(x => String(x.id) === st);
+    if (stObj && stObj.tipo === 'contato' && !obs) { er.textContent = 'No "Em contato" a observação é obrigatória: escreva o que foi conversado.'; return; }
+    if (stObj && ['perdido', 'descartado'].includes(stObj.tipo) && !obs) { er.textContent = 'Escreva a observação explicando a perda.'; return; }
+    const v = (id) => document.getElementById(id)?.value || '';
+    const ex = { contato };
+    if (v('x_data')) ex.data_visita = new Date(v('x_data')).toISOString();
+    if (v('x_cod')) ex.codigo_imovel = v('x_cod').trim();
+    if (v('x_valor')) ex.valor = v('x_valor');
+    if (v('x_pag')) ex.forma_pagamento = v('x_pag');
+    if (v('x_tipo')) ex.tipo_venda = v('x_tipo');
+    if (v('x_origem')) ex.origem_venda = v('x_origem');
+    if (v('x_hon')) ex.honorario = v('x_hon');
+    if (v('x_div')) ex.dividida = v('x_div') === 'sim';
+    if (ex.dividida) { if (!v('x_parceiro')) { er.textContent = 'Escolha com qual corretor a venda foi dividida.'; return; } ex.parceiro = v('x_parceiro'); }
+    b.disabled = true;
+    const { error } = await db.rpc('crm_vendas_mover_lead', { p_lead: ds.mover, p_status: +st, p_obs: obs, p_extras: ex });
+    b.disabled = false;
+    if (error) { er.textContent = error.message; return; }
+    aviso(stObj && stObj.tipo === 'contato' ? 'Contato registrado.' : 'Lead movido.');
+    const doModal = !document.getElementById('modal').hidden;
+    fecharModal();
+    const abaAntes = tela.nome;
+    await carregarFunil();
+    if (doModal) tela = { nome: abaAntes === 'pre' ? 'pre' : 'funil' };
+    else if (tela.nome === 'lead' && !FUN.leads.some(x => x.id === tela.id)) tela = { nome: 'funil' };
+    render();
+  }
+  else if (ds.salvarlead !== undefined) {
+    const v = (id) => document.getElementById(id)?.value.trim() || '';
+    const er = document.getElementById('nerro');
+    if (!v('n_nome') || !v('n_tel')) { er.textContent = 'Informe nome e WhatsApp.'; return; }
+    if (gestor() && !v('n_cor')) { er.textContent = 'Escolha o corretor responsável.'; return; }
+    b.disabled = true;
+    const { data, error } = await db.rpc('crm_vendas_novo_lead', { p_nome: v('n_nome'), p_telefone: v('n_tel'), p_origem: v('n_origem'), p_codigo_imovel: v('n_cod') || null, p_obs: v('n_obs') || null, p_corretor: gestor() ? v('n_cor') : (VER || null) });
+    b.disabled = false;
+    if (error) { er.textContent = error.message; return; }
+    aviso('Lead cadastrado em "Novo lead".');
+    await carregarFunil(); tela = { nome: 'lead', id: data }; render();
+  }
+});
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('modal').hidden) fecharModal(); });
+
+// ---------- atividades do corretor (metas da semana, registros com comprovação, pós-venda, base antiga, reunião) ----------
+const ATV = { mes: null, mesAno: null, mesNum: null, carregado: false, corretor: '', metas: null, pos: [], base: [], lista: [], game: [], reuniao: {}, form: '', geo: null };
+const segundaDaSemana = () => { const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })); const w = (d.getDay() + 6) % 7; d.setDate(d.getDate() - w); return d.toLocaleDateString('sv-SE'); };
+async function carregarAtividades() {
+  ATV.carregado = true;
+  if (souAprovador && !ATV.game.length) {
+    const { data: g } = await db.rpc('crm_vendas_corretores_game');
+    ATV.game = (g || []).map(x => typeof x === 'string' ? x : Object.values(x)[0]);
+    if (!ATV.corretor) ATV.corretor = ATV.game[0] || '';
+  }
+  const alvo = souAprovador ? (VER || ATV.corretor || null) : null;
+  if (gestor() && !alvo) { render(); return; }
+  const corId = alvo || usuario;
+  const hojeBR = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  if (!ATV.mesAno) { ATV.mesAno = hojeBR.getFullYear(); ATV.mesNum = hojeBR.getMonth() + 1; }
+  const [m, p, b, l, gm] = await Promise.all([
+    db.rpc('crm_vendas_metas_semana', { p_corretor: alvo }),
+    db.rpc('crm_vendas_pos_venda', { p_corretor: alvo }),
+    db.rpc('crm_vendas_base_antiga', { p_corretor: alvo }),
+    db.from('crm_vendas_atividades').select('*').eq('corretor_id', corId).order('quando', { ascending: false }).limit(30),
+    db.rpc('crm_vendas_atividades_mes', { p_corretor: alvo, p_ano: ATV.mesAno, p_mes: ATV.mesNum }),
+  ]);
+  ATV.mes = gm.data || null;
+  ATV.metas = m.data || {}; ATV.pos = p.data || []; ATV.base = b.data || []; ATV.lista = l.data || [];
+  if (gestor()) {
+    const { data: r } = await db.from('crm_vendas_reunioes').select('corretor_id, presente').eq('semana', segundaDaSemana());
+    ATV.reuniao = Object.fromEntries((r || []).map(x => [x.corretor_id, x.presente]));
+  }
+  if (tela.nome === 'ativ') render();
+}
+const TIPOS_ATIV = { visita_prospeccao: 'Visita de prospecção', visita_planta: 'Visita a imóvel na planta', post_instagram: 'Post no Instagram', avaliacao_google: 'Avaliação no Google', pos_venda: 'Contato de pós-venda' };
+function linhaMeta(nome, feito, meta, pts, auto, ok, extra) {
+  const pc = meta ? Math.min(100, Math.round(feito / meta * 100)) : (ok ? 100 : 0);
+  return `<div class="meta"><div class="t"><span>${nome} <span class="selo ${auto ? '' : 'azul'}">${auto ? 'automático' : 'registro'}</span></span><span>${ok ? '<span class="selo verde">✓ ' : ''}${extra || `${feito}/${meta}`}${ok ? '</span>' : ''}</span></div>
+    <div class="trilho"><div style="width:${pc}%;background:${ok ? 'var(--verde)' : 'var(--destaque)'}"></div></div><div class="p">${pts}</div></div>`;
+}
+// Grade do mês no estilo checklist: linhas = atividades, colunas = semanas e dias; tudo preenchido pelo que foi registrado.
+const LINHAS_GRADE = [
+  { k: 'visita_prospeccao', n: 'Visitas de prospecção', meta: 2, ok: (w) => w.visita_prospeccao >= 2, txt: (w) => `${w.visita_prospeccao}/2` },
+  { k: 'visita_planta', n: 'Visita a imóvel na planta', meta: 1, ok: (w) => w.visita_planta >= 1, txt: (w) => `${w.visita_planta}/1` },
+  { k: 'post_instagram', n: 'Posts no Instagram (2 vídeos)', meta: 3, ok: (w) => w.posts >= 3 && w.posts_video >= 2, txt: (w) => `${w.posts}/3` },
+  { k: 'contatos_prospeccao', n: 'Contatos de prospecção ativa', meta: 20, ok: (w) => w.contatos_prospeccao >= 20, txt: (w) => `${w.contatos_prospeccao}/20` },
+  { k: 'reativacoes', n: 'Reativação de clientes antigos', meta: 10, ok: (w) => w.reativacoes >= 10, txt: (w) => `${w.reativacoes}/10` },
+  { k: 'agenciamentos', n: 'Agenciamentos aprovados', meta: 3, ok: (w) => w.agenciamentos >= 3, txt: (w) => `${w.agenciamentos}/3` },
+  { k: 'visitas_realizadas', n: 'Visitas · feedback 24 h e follow-up 36 h', ok: (w) => w.visitas_realizadas > 0 && w.feedback_no_prazo >= w.visitas_realizadas && w.followup_no_prazo >= w.visitas_realizadas && !w.faltas_corretor, txt: (w) => w.visitas_realizadas ? `${Math.min(w.feedback_no_prazo, w.followup_no_prazo)}/${w.visitas_realizadas}` : '—', semMeta: true },
+  { k: 'pos_venda', n: 'Pós-venda e avaliações', txt: () => '', semMeta: true, soDias: true },
+  { k: 'reuniao', n: 'Reunião comercial semanal', meta: 1, ok: (w) => w.reuniao === true, txt: (w) => w.reuniao === true ? 'presente' : w.reuniao === false ? 'faltou' : 'a marcar', soSemana: true },
+];
+function gradeMes() {
+  const g = ATV.mes; if (!g) return '';
+  const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const ini = new Date(g.inicio + 'T12:00:00'), fim = new Date(g.fim + 'T12:00:00'), hoje = g.hoje;
+  const dia = (d) => d.toLocaleDateString('sv-SE');
+  // semanas: só os dias de segunda a sábado que caem no mês (domingo aparece se tiver registro)
+  const semanas = g.semanas.map(w => { const seg = new Date(w.semana + 'T12:00:00'); const dias = [];
+    for (let i = 0; i < 7; i++) { const d = new Date(+seg + i * 864e5); if (d < ini || d > fim) continue; const iso = dia(d);
+      if (i === 6 && !Object.values(g.diario).some(x => x[iso])) continue; dias.push({ iso, d }); }
+    return { w, dias }; }).filter(s => s.dias.length);
+  const comMeta = LINHAS_GRADE.filter(l => l.ok && !l.semMeta);
+  const passadas = semanas.filter(s => s.dias[0].iso <= hoje);
+  const possiveis = passadas.length * comMeta.length;
+  const batidas = passadas.reduce((a, s) => a + comMeta.filter(l => l.ok(s.w)).length, 0);
+  const registros = Object.entries(g.diario).filter(([k]) => k !== 'contatos').reduce((a, [, v]) => a + Object.values(v).reduce((x, y) => x + y, 0), 0);
+  const sigla = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+  const cab1 = semanas.map((s, i) => `<th colspan="${s.dias.length + 1}" class="gsem">Semana ${i + 1}</th>`).join('');
+  const cab2 = semanas.map(s => s.dias.map(x => `<th class="gdia ${x.iso === hoje ? 'ghoje' : ''}">${x.d.getDate()}<small>${sigla[x.d.getDay()]}</small></th>`).join('') + '<th class="gtot">Meta</th>').join('');
+  const linhas = LINHAS_GRADE.map(l => `<tr><td class="gnome gclick" data-gcel="${l.k}" data-gdia="${hoje}" title="Clique para registrar hoje">${l.n}${l.meta && !l.soSemana ? `<small>${l.meta} por semana</small>` : ''}</td>${semanas.map(s => {
+      const cel = s.dias.map(x => { const n = (g.diario[l.k] || {})[x.iso] || 0; const fut = x.iso > hoje;
+        return `<td class="gcel ${x.iso === hoje ? 'ghoje' : ''}" data-gcel="${l.k}" data-gdia="${x.iso}" title="${x.iso === hoje ? 'Clique para registrar' : ''}">${l.soSemana ? '' : n ? `<span class="gn">${n}</span>` : `<span class="gvazio ${fut ? 'gfut' : ''}"></span>`}</td>`; }).join('');
+      const fut = s.dias[0].iso > hoje; const ok = l.ok && l.ok(s.w);
+      const tot = l.soDias ? '' : fut ? '' : `<span class="selo ${ok ? 'verde' : l.semMeta && !s.w.visitas_realizadas ? '' : 'vermelho'}">${ok ? '✓ ' : ''}${l.txt(s.w)}</span>`;
+      return cel + `<td class="gtot">${tot}</td>`; }).join('')}</tr>`).join('');
+  return `<div class="card" style="margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <h2 style="font-size:16px;margin:0">Checklist do mês${gestor() ? ' · ' + esc(CORRETORES[ATV.corretor] || '') : ''}</h2>
+      <div class="gmeses">${meses.map((m, i) => `<button data-gmes="${i + 1}" class="${ATV.mesNum === i + 1 ? 'principal' : ''}">${m}</button>`).join('')}</div>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><small>Metas semanais batidas</small><b>${batidas}</b></div>
+      <div class="kpi"><small>Metas não batidas</small><b>${possiveis - batidas}</b></div>
+      <div class="kpi"><small>Evolução do mês</small><b style="color:var(--destaque)">${possiveis ? Math.round(batidas / possiveis * 100) : 0}%</b><div class="dica">${batidas} de ${possiveis} metas semanais</div></div>
+      <div class="kpi"><small>Registros no mês</small><b>${registros}</b><div class="dica">${(Object.values(g.diario.contatos || {}).reduce((a, b) => a + b, 0))} contatos com clientes</div></div>
+    </div>
+    <div style="overflow-x:auto"><table class="gchk"><thead><tr><th class="gnome" rowspan="2">Atividade</th>${cab1}</tr><tr>${cab2}</tr></thead><tbody>${linhas}</tbody></table></div>
+    <div class="dica" style="margin-top:8px"><b>Clique no quadradinho de hoje</b> para registrar a atividade. Cada número é quanto foi registrado no dia. A coluna "Meta" fica verde quando a meta da semana foi batida. Nada é marcado à mão: tudo vem do funil, dos imóveis e das atividades registradas.</div>
+  </div>`;
+}
+function telaAtividades() {
+  const m = ATV.metas;
+  const seletor = gestor() ? `<div class="barra"><select id="acorretor">${ATV.game.map(id => `<option value="${id}" ${ATV.corretor === id ? 'selected' : ''}>${esc(CORRETORES[id] || id)}</option>`).join('')}</select></div>` : '';
+  if (!m) return seletor + '<div class="vazio">Carregando as atividades…</div>';
+  const vr = m.visitas_realizadas || 0;
+  const metas = [
+    linhaMeta('Visitas de prospecção (presenciais)', m.visita_prospeccao, 2, '10 pontos por visita', false, m.visita_prospeccao >= 2),
+    linhaMeta('Visita a imóvel na planta', m.visita_planta, 1, '10 pontos', false, m.visita_planta >= 1),
+    linhaMeta('Posts no Instagram', m.posts, 3, '15 pontos ao bater: 3 posts, pelo menos 2 vídeos', false, m.posts >= 3 && m.posts_video >= 2, `${m.posts}/3 · ${m.posts_video} vídeo${m.posts_video === 1 ? '' : 's'}`),
+    linhaMeta('Contatos de prospecção ativa', m.contatos_prospeccao, 20, '15 pontos ao bater', true, m.contatos_prospeccao >= 20),
+    linhaMeta('Reativação de clientes antigos (90+ dias)', m.reativacoes, 10, '10 pontos ao bater', true, m.reativacoes >= 10),
+    linhaMeta('Agenciamentos aprovados', m.agenciamentos, 3, '14 pontos por agenciamento', true, m.agenciamentos >= 3),
+    linhaMeta('Feedback da visita em até 24 h', m.feedback_no_prazo, vr, '3 pontos por visita no prazo', true, vr > 0 && m.feedback_no_prazo >= vr, vr ? null : 'sem visitas'),
+    linhaMeta('Follow-up da visita em até 36 h', m.followup_no_prazo, vr, '3 pontos por visita no prazo', true, vr > 0 && m.followup_no_prazo >= vr, vr ? null : 'sem visitas'),
+    linhaMeta('Comparecimento às visitas', 0, 0, '15 pontos · falta sem aviso: −50', true, !m.faltas_corretor, m.faltas_corretor ? `${m.faltas_corretor} falta${m.faltas_corretor > 1 ? 's' : ''}` : 'sem faltas'),
+    linhaMeta('Reunião comercial semanal', 0, 0, '10 pontos · presença marcada pelo Marco', true, m.reuniao === true, m.reuniao === true ? 'presente' : m.reuniao === false ? 'faltou' : 'a marcar'),
+  ].join('');
+  const forms = {
+    visita_prospeccao: `<div class="q"><label>Foto no local *</label><input type="file" id="af_foto" accept="image/*" capture="environment"></div>
+      <div class="q"><label>Check-in *</label><button type="button" data-checkin style="width:100%">📍 Marcar minha localização agora</button><div class="dica" id="af_geo">${ATV.geo ? 'Localização marcada.' : ''}</div></div>
+      <div class="q"><label>Onde e com quem *</label><input id="af_desc" placeholder="Condomínio Jardim do Sol, conversei com o síndico"></div>`,
+    visita_planta: `<div class="q"><label>Empreendimento *</label><input id="af_desc" placeholder="Residencial Vista Mar"></div>
+      <div class="q"><label>Foto no empreendimento *</label><input type="file" id="af_foto" accept="image/*" capture="environment"></div>
+      <div class="q"><label>Check-in *</label><button type="button" data-checkin style="width:100%">📍 Marcar minha localização agora</button><div class="dica" id="af_geo">${ATV.geo ? 'Localização marcada.' : ''}</div></div>`,
+    post_instagram: `<div class="q"><label>Link do post *</label><input id="af_link" placeholder="https://www.instagram.com/p/..."></div>
+      <div class="q"><label>Tipo *</label><select id="af_sub"><option value="video">Vídeo / reels</option><option value="estatico">Estático</option></select></div>`,
+    avaliacao_google: `<div class="q"><label>Cliente da venda *</label><select id="af_lead"><option value="">Selecione</option>${[...new Map(ATV.pos.map(p => [p.lead_id, p.nome])).entries()].map(([id, n]) => `<option value="${id}">${esc(n)}</option>`).join('')}</select></div>
+      <div class="q"><label>Link da avaliação *</label><input id="af_link" placeholder="Cole o link da avaliação no Google"></div>`,
+  };
+  const pend = ATV.pos.filter(p => !p.feito);
+  const reuniao = gestor() ? `<div class="card" style="margin-top:12px"><h2 style="font-size:16px;margin:0 0 6px">Reunião desta semana</h2><div class="dica" style="margin-bottom:6px">Marque quem esteve presente.</div>
+    ${ATV.game.map(id => `<label class="lin" style="cursor:pointer"><span>${esc(CORRETORES[id] || id)}</span><input type="checkbox" data-reuniao="${id}" ${ATV.reuniao[id] ? 'checked' : ''} style="width:auto"></label>`).join('')}</div>` : '';
+  return `${seletor}${gradeMes()}<div class="det">
+    <div>
+      <div class="card"><h2 style="font-size:16px;margin:0 0 4px">Metas da semana${gestor() ? ' · ' + esc(CORRETORES[ATV.corretor] || '') : ''}</h2><div class="dica" style="margin-bottom:12px">Semana de ${new Date(m.semana + 'T12:00:00').toLocaleDateString('pt-BR')} (segunda a domingo)${m.leads_atrasados_hoje ? ` · <span style="color:var(--vermelho)">${m.leads_atrasados_hoje} leads atrasados hoje</span>` : ''}</div>${metas}</div>
+      <div class="card" style="margin-top:12px"><h2 style="font-size:16px;margin:0 0 6px">Base antiga · reativação</h2><div class="dica" style="margin-bottom:6px">Clientes sem contato há 90 dias ou mais. Registrar contato com eles conta como reativação.</div>
+        ${ATV.base.slice(0, 40).map(b => `<div class="lin"><span><b style="font-weight:600">${esc(b.nome || 'Sem nome')}</b><br><span class="dica">${esc(b.telefone || '')} · ${esc(b.funil)} / ${esc(b.fase)} · ${b.ultimo_contato ? 'último contato há ' + b.dias + ' dias' : 'sem contato registrado (' + b.dias + ' dias)'}</span></span>${`<button data-reativar="${b.lead_id}" data-nome="${esc(b.nome || '')}">Registrar contato</button>`}</div>`).join('') || '<div class="dica">Ninguém na base antiga.</div>'}
+        ${ATV.base.length > 40 ? `<div class="dica">+${ATV.base.length - 40} clientes</div>` : ''}</div>
+    </div>
+    <div>
+      ${`<div class="card"><h2 style="font-size:16px;margin:0 0 4px">Registrar atividade</h2>${gestor() ? `<div class="dica" style="margin-bottom:10px">Lançando para <b>${esc(CORRETORES[ATV.corretor] || '')}</b> (troque no seletor acima). Fica marcado como lançado por você.</div>` : '<div style="margin-bottom:10px"></div>'}
+        <div class="ativbtns">${['visita_prospeccao', 'visita_planta', 'post_instagram', 'avaliacao_google'].map(t => `<button data-ativform="${t}" class="${ATV.form === t ? 'on' : ''}">${{ visita_prospeccao: '📍 Visita de prospecção', visita_planta: '🏗 Imóvel na planta', post_instagram: '▶ Post no Instagram', avaliacao_google: '★ Avaliação no Google' }[t]}</button>`).join('')}</div>
+        ${ATV.form ? `<div style="margin-top:12px">${forms[ATV.form]}<div class="erro" id="af_erro"></div><button class="principal" data-salvarativ style="width:100%">Registrar</button></div>` : ''}</div>`}
+      <div class="card" style="margin-top:12px"><h2 style="font-size:16px;margin:0 0 6px">Pós-venda a fazer</h2>
+        ${pend.map(p => `<div class="lin"><span>${esc(p.nome || 'Cliente')} · ${p.marco} dias da venda<br><span class="dica">${new Date(p.vence_em) < new Date() ? '<span style="color:var(--vermelho)">venceu em ' : 'vence em '}${new Date(p.vence_em).toLocaleDateString('pt-BR')}${new Date(p.vence_em) < new Date() ? '</span>' : ''}</span></span>${`<button data-posvenda="${p.lead_id}" data-marco="${p.marco}" data-nome="${esc(p.nome || '')}">Registrar contato</button>`}</div>`).join('') || '<div class="dica">Nada pendente. Os lembretes aparecem sozinhos 30 e 90 dias depois de cada venda.</div>'}</div>
+      ${reuniao}
+      <div class="card" style="margin-top:12px"><h2 style="font-size:16px;margin:0 0 6px">Atividades registradas</h2>
+        ${ATV.lista.map(a => `<div class="lin"><span>${esc(TIPOS_ATIV[a.tipo] || a.tipo)}${a.subtipo ? ' · ' + (a.subtipo === 'video' ? 'vídeo' : 'estático') : ''}<br><span class="dica">${new Date(a.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}${a.descricao ? ' · ' + esc(a.descricao) : ''}${a.lat ? ` · <a href="https://maps.google.com/?q=${a.lat},${a.lng}" target="_blank" style="color:var(--azul)">ver no mapa</a>` : ''}</span></span>
+          <span>${a.foto_path ? `<button class="link" data-verarq="${esc(a.foto_path)}">foto</button>` : ''}${a.link ? `<a href="${esc(a.link)}" target="_blank" style="color:var(--azul);font-size:13px">link</a>` : ''}</span></div>`).join('') || '<div class="dica">Nenhuma atividade registrada ainda.</div>'}</div>
+    </div>
+  </div>`;
+}
+function modalContato(titulo, alvo) {
+  const m = document.getElementById('modal');
+  m.innerHTML = `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="font-size:16px;margin:0">${esc(titulo)}</h2><button data-fecharmodal aria-label="Fechar">✕</button></div>
+    <div class="q"><label for="cx_tipo">Contato feito *</label><select id="cx_tipo"><option value="">Como falou com o cliente?</option>${CONTATOS.map(c => `<option>${c}</option>`).join('')}</select></div>
+    <div class="q"><label for="cx_obs">Observação *</label><textarea id="cx_obs" rows="3" placeholder="O que foi conversado"></textarea></div>
+    ${alvo.tipo === 'reativar' ? '<label style="display:flex;gap:8px;align-items:center;font-size:14px;margin-bottom:10px"><input type="checkbox" id="cx_funil" style="width:auto"> O cliente respondeu: trazer para o funil de vendas (Em atendimento)</label>' : ''}
+    <div class="erro" id="cx_erro"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button data-fecharmodal>Cancelar</button><button class="principal" data-salvarcontato='${JSON.stringify(alvo).replace(/'/g, '&#39;')}'>Registrar</button></div></div>`;
+  m.hidden = false;
+}
+document.addEventListener('change', async e => {
+  if (e.target.id === 'acorretor') { ATV.corretor = e.target.value; ATV.metas = null; render(); carregarAtividades(); }
+  if (e.target.dataset && e.target.dataset.reuniao) {
+    const { error } = await db.from('crm_vendas_reunioes').upsert({ semana: segundaDaSemana(), corretor_id: e.target.dataset.reuniao, presente: e.target.checked });
+    if (error) { aviso('Não foi possível salvar a presença.', true); e.target.checked = !e.target.checked; return; }
+    ATV.reuniao[e.target.dataset.reuniao] = e.target.checked; aviso('Presença salva.');
+    if (e.target.dataset.reuniao === ATV.corretor) carregarAtividades();
+  }
+});
+document.addEventListener('click', async e => {
+  const gc = e.target.closest('[data-gcel]');
+  if (gc) {
+    const k = gc.dataset.gcel, diaCel = gc.dataset.gdia, hojeBR = ATV.mes?.hoje;
+    const AUTO = { contatos_prospeccao: 'Conta sozinho: cada contato registrado em leads da sua prospecção (aba Funil, botão "Mover etapa" → "Em contato") e cada lead novo de prospecção.',
+      reativacoes: 'Conta sozinho: registre um contato com um cliente da lista "Base antiga", aqui embaixo nesta aba.',
+      agenciamentos: 'Conta sozinho quando o gestor aprova um imóvel cadastrado na aba Imóveis.',
+      visitas_realizadas: 'Conta sozinho: na aba Funil, mova o lead para "Visita realizada" e depois registre o follow-up.',
+      reuniao: 'A presença na reunião é marcada pelo gestor.' };
+    if (AUTO[k]) { aviso(AUTO[k]); return; }
+    if (diaCel !== hojeBR) { aviso(diaCel > hojeBR ? 'Esse dia ainda não chegou. Registre no dia, com a foto e o check-in de agora.' : 'Só dá para registrar no dia de hoje: a foto e o check-in comprovam que foi agora.'); return; }
+    if (k === 'pos_venda') { const el = [...document.querySelectorAll('.card h2')].find(h => h.textContent.startsWith('Pós-venda')); if (el) { el.closest('.card').classList.add('destacar'); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } aviso(ATV.pos.some(p => !p.feito) ? 'Escolha o cliente em "Pós-venda a fazer".' : 'Nenhum pós-venda pendente: eles aparecem 30 e 90 dias depois de cada venda.'); return; }
+    ATV.form = k; ATV.geo = null; render();
+    const card = document.querySelector('[data-salvarativ]')?.closest('.card');
+    if (card) { card.classList.add('destacar'); card.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    return;
+  }
+  const gm = e.target.closest('[data-gmes]');
+  if (gm) { ATV.mesNum = +gm.dataset.gmes; const { data } = await db.rpc('crm_vendas_atividades_mes', { p_corretor: souAprovador ? (VER || ATV.corretor || null) : null, p_ano: ATV.mesAno, p_mes: ATV.mesNum }); ATV.mes = data; render(); return; }
+  const b = e.target.closest('[data-ativform], [data-checkin], [data-salvarativ], [data-posvenda], [data-reativar], [data-salvarcontato]');
+  if (!b) return;
+  const ds = b.dataset;
+  if (ds.ativform) { ATV.form = ATV.form === ds.ativform ? '' : ds.ativform; ATV.geo = null; render(); }
+  else if (ds.checkin !== undefined) {
+    const info = document.getElementById('af_geo');
+    if (!navigator.geolocation) { info.textContent = 'Este aparelho não informa a localização.'; return; }
+    info.textContent = 'Buscando sua localização…';
+    navigator.geolocation.getCurrentPosition(p => { ATV.geo = { lat: p.coords.latitude, lng: p.coords.longitude, precisao: p.coords.accuracy }; info.textContent = `Localização marcada (precisão de ${Math.round(p.coords.accuracy)} m).`; },
+      () => { info.textContent = 'Não foi possível pegar a localização. Libere o acesso à localização no navegador.'; }, { enableHighAccuracy: true, timeout: 15000 });
+  }
+  else if (ds.salvarativ !== undefined) {
+    const er = document.getElementById('af_erro'), t = ATV.form;
+    const v = (id) => document.getElementById(id)?.value.trim() || '';
+    const foto = document.getElementById('af_foto')?.files[0];
+    if ((t === 'visita_prospeccao' || t === 'visita_planta') && (!foto || !ATV.geo || !v('af_desc'))) { er.textContent = !foto ? 'Tire ou anexe a foto.' : !ATV.geo ? 'Marque o check-in no local.' : 'Preencha a descrição.'; return; }
+    if ((t === 'post_instagram' || t === 'avaliacao_google') && !v('af_link')) { er.textContent = 'Cole o link.'; return; }
+    if (t === 'avaliacao_google' && !v('af_lead')) { er.textContent = 'Escolha o cliente da venda.'; return; }
+    b.disabled = true; er.style.color = 'var(--suave)'; er.textContent = 'Salvando…';
+    let foto_path = null;
+    if (foto) {
+      foto_path = `${sessao.user.id}/atividades/${Date.now()}-${foto.name.normalize('NFD').replace(/[^\w.-]+/g, '_').slice(-60)}`;
+      const up = await db.storage.from('crm-vendas').upload(foto_path, foto, { contentType: foto.type || undefined });
+      if (up.error) { b.disabled = false; er.style.color = ''; er.textContent = 'Não foi possível enviar a foto.'; return; }
+    }
+    const row = { corretor_id: gestor() ? ATV.corretor : usuario, tipo: t, descricao: v('af_desc') || null, link: v('af_link') || null, subtipo: v('af_sub') || null, foto_path, lead_id: v('af_lead') || null,
+      lat: ATV.geo?.lat ?? null, lng: ATV.geo?.lng ?? null, precisao: ATV.geo?.precisao ?? null };
+    const { error } = await db.from('crm_vendas_atividades').insert(row);
+    b.disabled = false;
+    if (error) { er.style.color = ''; er.textContent = error.message; return; }
+    aviso('Atividade registrada.'); ATV.form = ''; ATV.geo = null; carregarAtividades();
+  }
+  else if (ds.posvenda) modalContato(`Pós-venda · ${ds.nome} (${ds.marco} dias)`, { tipo: 'posvenda', lead: ds.posvenda, marco: +ds.marco });
+  else if (ds.reativar) modalContato(`Reativação · ${ds.nome}`, { tipo: 'reativar', lead: ds.reativar });
+  else if (ds.salvarcontato) {
+    const alvo = JSON.parse(ds.salvarcontato), er = document.getElementById('cx_erro');
+    const tipo = document.getElementById('cx_tipo').value, obs = document.getElementById('cx_obs').value.trim();
+    if (!tipo) { er.textContent = 'Escolha como foi o contato.'; return; }
+    if (!obs) { er.textContent = 'Escreva a observação.'; return; }
+    b.disabled = true;
+    let error;
+    if (alvo.tipo === 'posvenda') {
+      ({ error } = await db.from('crm_vendas_atividades').insert({ corretor_id: gestor() ? ATV.corretor : usuario, tipo: 'pos_venda', lead_id: alvo.lead, descricao: obs, extras: { marco: alvo.marco, contato: tipo } }));
+    } else {
+      const paraFunil = document.getElementById('cx_funil')?.checked;
+      const st = FUN.status.find(s => paraFunil ? (s.nome === 'Respondeu') : s.tipo === 'contato');
+      ({ error } = await db.rpc('crm_vendas_mover_lead', { p_lead: alvo.lead, p_status: st.id, p_obs: obs, p_extras: { contato: tipo } }));
+    }
+    b.disabled = false;
+    if (error) { er.textContent = error.message; return; }
+    fecharModal(); aviso('Contato registrado.');
+    await Promise.all([carregarAtividades(), carregarFunil()]);
+  }
+});
+
+// ---------- pontuação do game de desenvolvimento (semestre) ----------
+const PTS = { carregado: false, ranking: null, aberto: null };
+async function carregarPontos() {
+  PTS.carregado = true;
+  const { data, error } = await db.rpc('crm_vendas_ranking');
+  if (error) { aviso('Não foi possível calcular a pontuação.', true); return; }
+  PTS.ranking = (data || []).map(r => VER && r.corretor_id !== VER ? (({ itens, ...x }) => x)(r) : r);
+  if (VER) PTS.aberto = VER;
+  if (!PTS.aberto) PTS.aberto = gestor() ? PTS.ranking[0]?.corretor_id : usuario;
+  if (tela.nome === 'pontos') render();
+}
+const fmtPts = (n) => Number(n || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+function telaPontos() {
+  if (!PTS.ranking) return '<div class="vazio">Calculando a pontuação…</div>';
+  const sem = PTS.ranking[0]?.semestre;
+  const periodo = sem ? `${new Date(sem.inicio + 'T12:00:00').toLocaleDateString('pt-BR')} a ${new Date(sem.fim + 'T12:00:00').toLocaleDateString('pt-BR')}` : '';
+  let pos = 0;
+  const linhas = PTS.ranking.map(r => {
+    if (r.ativado) pos++;
+    const podeAbrir = gestor() || r.corretor_id === usuario;
+    return `<div class="lin" ${podeAbrir ? `data-abrirpts="${r.corretor_id}" style="cursor:pointer"` : ''}>
+      <span><b style="font-weight:600">${r.ativado ? pos + 'º · ' : ''}${esc(r.nome)}</b>${r.corretor_id === usuario ? ' <span class="selo azul">você</span>' : ''}<br>
+      <span class="dica">${r.ativado ? r.vendas + (r.vendas === 1 ? ' venda' : ' vendas') + ' no semestre' : 'Pontos guardados: entram no ranking na 1ª venda'}${Number(r.corte_teto) > 0 ? ' · agenciamento limitado a 42%' : ''}</span></span>
+      <span style="font-size:20px;font-weight:700;${r.ativado ? '' : 'color:var(--suave)'}">${fmtPts(r.total)}</span></div>`;
+  }).join('');
+  const r = PTS.ranking.find(x => x.corretor_id === PTS.aberto && x.itens);
+  let det = '<div class="dica">Clique no seu nome para ver o detalhe.</div>';
+  if (r) {
+    const grupos = [...new Set(r.itens.map(i => i.grupo))];
+    det = `<h2 style="font-size:16px;margin:0 0 4px">${esc(r.nome)} · ${fmtPts(r.total)} pontos</h2>
+      ${!r.ativado ? '<div class="aviso" style="background:var(--ambar-claro);color:var(--ambar);margin:8px 0">Os pontos ficam guardados e só passam a valer depois da primeira venda no semestre.</div>' : ''}
+      ${Number(r.corte_teto) > 0 ? `<div class="aviso" style="background:var(--azul-claro);color:var(--azul);margin:8px 0">Agenciamento passou de 42% do total: ${fmtPts(r.corte_teto)} pontos de agenciamento não contam.</div>` : ''}
+      ${grupos.map(g => { const its = r.itens.filter(i => i.grupo === g); const sub = its.reduce((a, i) => a + Number(i.pontos), 0);
+        return `<div class="bloco" style="margin-top:12px"><h3 style="display:flex;justify-content:space-between"><span>${esc(g)}</span><span>${fmtPts(sub)}</span></h3>
+          ${its.map(i => `<div class="linha"><span>${esc(i.item)}</span><span style="${Number(i.pontos) < 0 ? 'color:var(--vermelho)' : Number(i.pontos) > 0 ? 'font-weight:600' : 'color:var(--suave)'}">${fmtPts(i.pontos)}</span></div>`).join('')}</div>`; }).join('')}
+      <div class="dica" style="margin-top:10px">O total do semestre nunca fica negativo. A recompensa do líder ainda será definida.</div>`;
+  }
+  return `<div class="det">
+    <div class="card"><h2 style="font-size:16px;margin:0 0 2px">Ranking do semestre</h2><div class="dica" style="margin-bottom:8px">${esc(sem?.nome || 'Game de desenvolvimento')} · ${periodo}</div>${sem?.teste ? '<div class="aviso" style="background:var(--ambar-claro);color:var(--ambar);margin-bottom:8px">Semestre de teste: serve para todos aprenderem o sistema. O semestre oficial começa em 01/01/2027, com pontuação zerada.</div>' : ''}${linhas || '<div class="dica">Nenhum corretor no game.</div>'}
+      <div class="dica" style="margin-top:10px">Atualiza sozinho com o que é registrado no funil, nos imóveis e nas atividades.</div></div>
+    <div class="card">${det}</div>
+  </div>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-abrirpts]'); if (!b) return;
+  PTS.aberto = b.dataset.abrirpts; render();
+});
+
+// ---------- painel de gestão ----------
+const PNL = { dados: null, periodo: '30d' };
+function periodoPainel() {
+  const agora = new Date(); const br = new Date(agora.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  const inicioDia = new Date(br.getFullYear(), br.getMonth(), br.getDate());
+  const off = agora - br; // diferença do fuso
+  const ini = { hoje: inicioDia, '7d': new Date(inicioDia - 6 * 864e5), '30d': new Date(inicioDia - 29 * 864e5), mes: new Date(br.getFullYear(), br.getMonth(), 1),
+    tri: new Date(br.getFullYear(), Math.floor(br.getMonth() / 3) * 3, 1) }[PNL.periodo];
+  return [new Date(+ini + off).toISOString(), agora.toISOString()];
+}
+async function carregarPainel() {
+  const [ini, fim] = periodoPainel();
+  const { data, error } = await db.rpc('crm_vendas_painel', { p_ini: ini, p_fim: fim });
+  if (error) { aviso('Não foi possível carregar o painel.', true); return; }
+  PNL.dados = data; if (tela.nome === 'painel') render();
+}
+const pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '—';
+function telaPainel() {
+  const d = PNL.dados;
+  const per = `<div class="barra">${[['hoje', 'Hoje'], ['7d', '7 dias'], ['30d', '30 dias'], ['mes', 'Este mês'], ['tri', 'Este trimestre']].map(([k, t]) => `<button data-periodo="${k}" class="${PNL.periodo === k ? 'principal' : ''}">${t}</button>`).join('')}</div>`;
+  if (!d) return per + '<div class="vazio">Carregando o painel…</div>';
+  const m = d.movimento, im = d.imoveis, at = d.atrasos || {};
+  const kpi = (t, v, sub) => `<div class="kpi"><small>${t}</small><b>${v}</b>${sub ? `<div class="dica">${sub}</div>` : ''}</div>`;
+  const funil = (k) => { const fs = d.funil_agora.filter(f => f.funil === k); const mx = Math.max(1, ...fs.map(f => f.leads));
+    return fs.map(f => `<div style="display:grid;grid-template-columns:150px 1fr 40px;gap:8px;align-items:center;font-size:13px;margin:4px 0"><span>${esc(f.fase)}</span><div class="trilho" style="margin:0"><div style="width:${Math.round(f.leads / mx * 100)}%"></div></div><span style="text-align:right">${f.leads}</span></div>`).join(''); };
+  const totAtr = Object.values(at).reduce((a, b) => a + b, 0);
+  return `${per}
+  ${POSSE.length ? `<button class="aviso" style="display:block;width:100%;text-align:left;border:none;background:var(--vermelho-claro);color:var(--vermelho)" data-aba="aprovacao">🔔 <b>${POSSE.length} imóve${POSSE.length > 1 ? 'is perderam' : 'l perdeu'} a posse (61º dia)</b> e aguarda${POSSE.length > 1 ? 'm' : ''} sua decisão. Clique para ver.</button>` : ''}
+  ${DB.imoveis.some(i => i.status === 'aguardando') ? `<button class="aviso" style="display:block;width:100%;text-align:left;border:none;background:var(--azul-claro);color:var(--azul)" data-aba="aprovacao">${DB.imoveis.filter(i => i.status === 'aguardando').length} agenciamento(s) aguardando sua aprovação. Clique para ver.</button>` : ''}
+  <div class="kpis">
+    ${kpi('Novos leads', m.novos_leads)}${kpi('Contatos registrados', m.contatos)}${kpi('Visitas realizadas', m.visitas_realizadas, `${m.visitas_agendadas} agendadas · ${m.noshow_cliente + m.noshow_corretor} não compareceram`)}
+    ${kpi('Propostas', m.propostas)}${kpi('Vendas', m.vendas, `VGV ${brl(m.vgv)}`)}${kpi('Honorários', brl(m.honorarios))}
+  </div>
+  <div class="kpis">
+    ${kpi('Lead → visita', pct(m.visitas_agendadas, m.novos_leads))}${kpi('Comparecimento', pct(m.visitas_realizadas, m.visitas_realizadas + m.noshow_cliente + m.noshow_corretor))}
+    ${kpi('Visita → proposta', pct(m.propostas, m.visitas_realizadas))}${kpi('Visita → venda', pct(m.vendas, m.visitas_realizadas), 'meta 10%')}
+    ${kpi('Atrasados agora', `<span style="color:${totAtr ? 'var(--vermelho)' : 'inherit'}">${totAtr}</span>`, [['retorno', 'lead novo 24 h'], ['feedback', 'feedback'], ['followup', 'follow-up'], ['parado', 'parados 5+ dias']].filter(([k]) => at[k]).map(([k, t]) => `${at[k]} ${t}`).join(' · '))}
+  </div>
+  <div class="card" style="margin-bottom:12px;overflow-x:auto"><h2 style="font-size:16px;margin:0 0 8px">Corretores no período</h2>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:820px"><thead><tr style="color:var(--suave);text-align:left">
+      ${['Corretor', 'Leads abertos', 'Atrasados', 'Contatos', 'Visitas', 'Propostas', 'Vendas', 'VGV', 'Faltas', 'Atividades', 'Agenc.', 'Carteira', 'Pontos'].map(h => `<th style="padding:6px 4px;font-weight:600">${h}</th>`).join('')}</tr></thead><tbody>
+      ${d.corretores.map(c => `<tr style="border-top:1px solid var(--borda)"><td style="padding:7px 4px;font-weight:600">${esc(c.nome)}</td><td>${c.leads_abertos}</td><td style="color:${c.atrasados ? 'var(--vermelho)' : 'inherit'}">${c.atrasados}</td><td>${c.contatos}</td><td>${c.visitas}</td><td>${c.propostas}</td><td>${c.vendas}</td><td>${brl(c.vgv)}</td><td style="color:${c.faltas ? 'var(--vermelho)' : 'inherit'}">${c.faltas}</td><td>${c.atividades}</td><td>${c.agenciamentos}</td>
+        <td>${c.imoveis_ativos ? `${c.imoveis_ativos} · nota ${fmtPts(c.media_carteira)} · ${c.carteira_em_dia}% em dia` : '—'}</td><td>${fmtPts(c.pontos)}${c.pontos_ativos ? '' : ' <span class="dica">(guardados)</span>'}</td></tr>`).join('')}
+    </tbody></table></div>
+  <div class="det">
+    <div class="card"><h2 style="font-size:16px;margin:0 0 8px">Como está o funil agora</h2>
+      <h3 style="font-size:13px;color:var(--suave);margin:4px 0">Pré-atendimento</h3>${funil('pre')}
+      <h3 style="font-size:13px;color:var(--suave);margin:12px 0 4px">Funil de vendas</h3>${funil('vendas')}</div>
+    <div>
+      <div class="card"><h2 style="font-size:16px;margin:0 0 8px">Perdas por motivo e etapa</h2>
+        ${d.perdas.map(p => `<div class="linha"><span>${esc(p.motivo)} · <span class="dica">${p.tipo}${p.etapa ? ' em ' + esc(p.etapa) : ''}</span></span><span>${p.n}</span></div>`).join('') || '<div class="dica">Nenhuma perda no período.</div>'}</div>
+      <div class="card" style="margin-top:12px"><h2 style="font-size:16px;margin:0 0 8px">Imóveis</h2>
+        <div class="linha"><span>Aguardando sua aprovação</span><span>${im.aguardando}</span></div>
+        <div class="linha"><span>Ativos</span><span>${im.ativos}${im.media_nota ? ' · nota média ' + fmtPts(im.media_nota) : ''}</span></div>
+        <div class="linha"><span>Desatualizados (41 a 60 dias)</span><span style="color:${im.desatualizados ? 'var(--vermelho)' : 'inherit'}">${im.desatualizados}</span></div>
+        <div class="linha"><span>Perderam a posse (61+ dias)</span><span style="color:${im.posse_perdida ? 'var(--vermelho)' : 'inherit'}">${im.posse_perdida}</span></div>
+        <div class="linha"><span>Agenciamentos aprovados no período</span><span>${m.agenciamentos}</span></div></div>
+    </div>
+  </div>`;
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-periodo]'); if (b) { PNL.periodo = b.dataset.periodo; PNL.dados = null; render(); carregarPainel(); } });
+
+// ---------- game trimestral: categoria e comissão ----------
+const COM = { carregado: false, dados: null, ano: null, tri: null, aberto: null };
+async function carregarComissao() {
+  COM.carregado = true;
+  const { data, error } = await db.rpc('crm_vendas_trimestre', { p_ano: COM.ano, p_tri: COM.tri });
+  if (error) { aviso('Não foi possível calcular a comissão.', true); return; }
+  if (VER) data.corretores = data.corretores.filter(c => c.corretor_id === VER);
+  COM.dados = data; COM.ano = data.ano; COM.tri = data.trimestre;
+  if (!COM.aberto || !data.corretores.some(c => c.corretor_id === COM.aberto)) COM.aberto = data.corretores[0]?.corretor_id;
+  if (tela.nome === 'comissao') render();
+}
+const CORES_CAT = { Ferro: 'var(--suave)', Prata: 'var(--azul)', Ouro: 'var(--ambar)', Platina: 'var(--destaque)' };
+const TIPO_VENDA = { terceiro: 'Imóvel de terceiro', incorporadora: 'Incorporadora', construcao: 'Construção Projetar' };
+function telaComissao() {
+  const d = COM.dados;
+  if (!d) return '<div class="vazio">Calculando a comissão…</div>';
+  const opcoesTri = []; for (let y = 2026; y <= new Date().getFullYear() + 1; y++) for (let t = 1; t <= 4; t++) if (y > 2026 || t === 4) opcoesTri.push([y, t]);
+  const barra = `<div class="barra"><select id="ctri">${opcoesTri.map(([y, t]) => `<option value="${y}-${t}" ${y === d.ano && t === d.trimestre ? 'selected' : ''}>${t}º trimestre de ${y}${y === 2026 ? ' (teste)' : ''}</option>`).join('')}</select>
+    ${gestor() ? `<select id="ccor">${d.corretores.map(c => `<option value="${c.corretor_id}" ${COM.aberto === c.corretor_id ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select>` : ''}
+    <span class="dica">${d.fechado ? 'Trimestre fechado' : 'Trimestre em andamento: valores finais são projeção'}</span></div>`;
+  const c = d.corretores.find(x => x.corretor_id === COM.aberto);
+  if (!c) return barra + '<div class="vazio">Nenhum corretor no game.</div>';
+  const geral = gestor() ? `<div class="card" style="margin-bottom:12px"><h2 style="font-size:16px;margin:0 0 6px">Equipe no trimestre</h2>
+    ${d.corretores.map(x => `<div class="lin" data-abrircom="${x.corretor_id}" style="cursor:pointer"><span><b style="font-weight:600">${esc(x.nome)}</b> <span class="selo" style="color:${CORES_CAT[x.categoria_trimestre]}">${x.categoria_trimestre}</span> → <span class="selo" style="color:${CORES_CAT[x.categoria_apurada]}">${x.categoria_apurada}</span><br><span class="dica">${fmtPts(x.vendas)} venda${Number(x.vendas) === 1 ? '' : 's'} · VGV ${brl(x.vgv)}</span></span>
+      <span style="text-align:right">${brl(x.total_ato)} no ato<br><span class="dica">+ ${brl(x.diferenca)} diferença · ${brl(x.total_agenciador)} agenciador</span></span></div>`).join('')}</div>` : '';
+  const progresso = c.proxima ? `<div class="dica" style="margin-top:8px">Para <b>${c.proxima}</b>, falta${[Number(c.falta_vendas) > 0 ? `m ${fmtPts(c.falta_vendas)} venda${c.falta_vendas == 1 ? '' : 's'}` : '', Number(c.falta_vgv) > 0 ? `${Number(c.falta_vendas) > 0 ? '' : ''} ${brl(c.falta_vgv)} de VGV` : ''].filter(Boolean).join(' e')} neste trimestre.</div>` : '<div class="dica" style="margin-top:8px">Categoria máxima: Platina (50% + time).</div>';
+  const lin = (v) => `<div class="lin"><span><b style="font-weight:600">${esc(v.cliente || 'Cliente')}</b>${v.papel === 'parceiro' ? ' <span class="selo">dividida</span>' : v.fator < 1 ? ' <span class="selo">dividida</span>' : ''}<br>
+      <span class="dica">${new Date(v.data).toLocaleDateString('pt-BR')} · ${esc(TIPO_VENDA[v.tipo] || v.tipo)} · ${brl(v.valor)} × ${fmtPts(v.honorario_pct)}%${v.fator < 1 ? ' × 50%' : ''} = honorário ${brl(v.honorario_rs)}${v.agenciador ? ` · agenciador: ${esc(v.agenciador)} (−10%)` : ''}</span></span>
+      <span style="text-align:right">${brl(v.valor_ato)} no ato (${v.pct_ato}%)<br><span class="dica">${brl(v.valor_final)} final (${v.pct_final}%) · diferença ${brl(v.diferenca)}</span></span></div>`;
+  return `${barra}${geral}<div class="det">
+    <div class="card">
+      <h2 style="font-size:16px;margin:0 0 4px">${esc(c.nome)}</h2>
+      ${d.teste ? '<div class="aviso" style="background:var(--ambar-claro);color:var(--ambar);margin:6px 0">Trimestre de teste. O oficial começa em 01/01/2027, todos em Ferro.</div>' : ''}
+      <div class="kpis" style="margin:10px 0">
+        <div class="kpi"><small>Categoria neste trimestre</small><b style="color:${CORES_CAT[c.categoria_trimestre]}">${c.categoria_trimestre}</b></div>
+        <div class="kpi"><small>${d.fechado ? 'Apurada no fechamento' : 'Se fechasse hoje'}</small><b style="color:${CORES_CAT[c.categoria_apurada]}">${c.categoria_apurada}</b></div>
+        <div class="kpi"><small>Vendas no trimestre</small><b>${fmtPts(c.vendas)}</b></div>
+        <div class="kpi"><small>VGV no trimestre</small><b style="font-size:18px">${brl(c.vgv)}</b></div>
+      </div>
+      ${progresso}
+      <div class="bloco" style="margin-top:14px"><h3>Vendas do trimestre</h3>${c.lista_vendas.map(lin).join('') || '<div class="dica">Nenhuma venda no trimestre.</div>'}</div>
+      <div class="bloco"><h3>Como agenciador</h3>${c.lista_agenciador.map(a => `<div class="lin"><span>${esc(a.cliente || 'Cliente')} · vendido por ${esc(a.vendedor)}<br><span class="dica">Cód. ${esc(a.codigo_imovel)} · honorário ${brl(a.honorario_rs)} · média da sua carteira ${fmtPts(a.media_carteira)} → ${a.pct}%</span></span><span>${brl(a.valor)}</span></div>`).join('') || '<div class="dica">Nenhum imóvel seu vendido por outro corretor.</div>'}</div>
+    </div>
+    <div class="card">
+      <h2 style="font-size:16px;margin:0 0 10px">Resumo a receber</h2>
+      <div class="linha"><span>Pago no ato (mínimo)</span><span>${brl(c.total_ato)}</span></div>
+      <div class="linha"><span>Diferença no fechamento</span><span>${brl(c.diferenca)}</span></div>
+      <div class="linha"><span>Como agenciador</span><span>${brl(c.total_agenciador)}</span></div>
+      ${Number(c.total_time) > 0 ? `<div class="linha"><span>Time Platina (5%)</span><span>${brl(c.total_time)}</span></div>` : ''}
+      <div class="linha" style="font-weight:700"><span style="color:var(--texto)">Total do trimestre</span><span>${brl(c.total_a_receber)}</span></div>
+      <div class="dica" style="margin-top:12px">Regras: Ferro 30% · Prata 40% (2 vendas e R$ 600 mil) · Ouro 50% (3 e R$ 900 mil) · Platina 50% + time (5 e R$ 1,5 mi). Construção Projetar: 40/50/60/60%. Sobe quantos níveis atingir, mantém se repetir, desce um nível se ficar abaixo. A categoria apurada vale para as vendas do trimestre e para o próximo.</div>
+    </div>
+  </div>`;
+}
+document.addEventListener('change', e => {
+  if (e.target.id === 'ctri') { const [y, t] = e.target.value.split('-').map(Number); COM.ano = y; COM.tri = t; COM.dados = null; render(); carregarComissao(); }
+  if (e.target.id === 'ccor') { COM.aberto = e.target.value; render(); }
+});
+document.addEventListener('click', e => { const b = e.target.closest('[data-abrircom]'); if (b) { COM.aberto = b.dataset.abrircom; render(); } });
+
+// ---------- login (mesmo login do CRM Leads) ----------
+const $ = (id) => document.getElementById(id);
+async function entrar(s) {
+  sessao = s;
+  if (!s) { $('login').hidden = false; $('app').hidden = true; $('quem').hidden = true; $('abas').innerHTML = ''; return; }
+  const { data: participa } = await db.rpc('crm_vendas_participa');
+  if (!participa) {
+    await db.auth.signOut(); sessao = null;
+    $('erro-login').textContent = 'Este login ainda não tem acesso ao CRM Vendas. Fale com o Marco.';
+    $('login').hidden = false; $('app').hidden = true; return;
+  }
+  const [{ data: aprov }, { data: meu }, { data: cors }] = await Promise.all([
+    db.rpc('crm_vendas_aprovador'), db.rpc('crm_meu_corretor'), db.from('corretores').select('id, nome, ativo'),
+  ]);
+  souAprovador = !!aprov; usuario = meu; MEU_CORRETOR = meu; VER = null;
+  CORRETORES = Object.fromEntries((cors || []).map(c => [c.id, c.nome]));
+  CORRETORES_ATIVOS = (cors || []).filter(c => c.ativo).sort((a, b) => a.nome.localeCompare(b.nome));
+  $('quem-nome').textContent = souAprovador ? 'Marco · gestor' : (CORRETORES[usuario] || s.user.email);
+  $('vercomo-box').hidden = !souAprovador;
+  if (souAprovador) {
+    const { data: g } = await db.rpc('crm_vendas_corretores_game');
+    const ids = (g || []).map(x => typeof x === 'string' ? x : Object.values(x)[0]);
+    $('vercomo').innerHTML = '<option value="">Gestor (você)</option>' + ids.map(id => `<option value="${id}">${esc(CORRETORES[id] || id)} (corretor)</option>`).join('');
+  }
+  $('login').hidden = true; $('app').hidden = false; $('quem').hidden = false;
+  await Promise.all([carregar(), carregarFunil()]);
+  if (modoLink && usuario && !souAprovador) abrirForm(novoImovel(usuario)); else { modoLink = false; tela = { nome: souAprovador ? 'painel' : 'funil' }; render(); }
+}
+$('form-login').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('erro-login').textContent = '';
+  const { data, error } = await db.auth.signInWithPassword({ email: $('email').value.trim(), password: $('senha').value });
+  if (error) { $('erro-login').textContent = 'E-mail ou senha incorretos.'; return; }
+  entrar(data.session);
+});
+$('vercomo').addEventListener('change', async (e) => {
+  VER = e.target.value || null;
+  usuario = VER || MEU_CORRETOR;
+  document.body.classList.toggle('vendo-como', !!VER);
+  $('quem-nome').textContent = VER ? `vendo como ${CORRETORES[VER]}` : 'Marco · gestor';
+  ATV.carregado = false; ATV.metas = null; PTS.carregado = false; PTS.ranking = null; COM.carregado = false; COM.dados = null; PNL.dados = null;
+  await Promise.all([carregar(), carregarFunil()]);
+  tela = { nome: 'funil' }; render();
+});
+$('sair').addEventListener('click', async () => { await db.auth.signOut(); entrar(null); });
+db.auth.getSession().then(({ data }) => entrar(data.session));
+</script>
+</body>
+</html>
