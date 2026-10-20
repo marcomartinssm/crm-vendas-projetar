@@ -54,6 +54,11 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 ## Descrição com IA
 - Edge function `crm-vendas-descricao` (código em `supabase/functions/crm-vendas-descricao/index.ts`), modelo claude-opus-5-5, saída estruturada. Precisa do secret `ANTHROPIC_API_KEY` no Supabase (Edge Functions → Secrets). Sem a chave, o botão avisa que a IA ainda não está ligada.
 
+## Endereço publicado
+- https://marcomartinssm.github.io/crm-vendas-projetar/ (link direto de cadastro de imóvel: `.../#novo`)
+- Repositório público `marcomartinssm/crm-vendas-projetar` (GitHub Pages, branch main, raiz). Para atualizar: commit + push na main; o site atualiza em ~1 minuto.
+- O CRM Leads continua separado (`crmleads-projetar`), como segurança.
+
 ## Abrir no Mac
 ```
 python3 -m http.server 8897 --directory "/Users/marcomartins/Documents/IA e automações/Claude/CRM Vendas - CC"
