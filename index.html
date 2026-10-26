@@ -133,6 +133,12 @@
   .kcopia { border: none; background: none; padding: 0 4px; color: var(--suave); font-size: 13px; }
   .kult { font-size: 12px; color: var(--suave); margin: 6px 0; font-weight: 600; }
   .kult.alerta { color: var(--vermelho); }
+  .fsec { background: var(--card); border: 1px solid var(--borda); border-radius: 12px; padding: 10px; margin-bottom: 12px; }
+  .fsec > .khead { font-size: 14px; }
+  .fsec .dica { margin: -4px 2px 8px; }
+  .fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+  .fgrid .kcard { margin-bottom: 0; }
+  .fmais { font-size: 13px; color: var(--suave); margin-top: 8px; }
   .kmover { width: 100%; padding: 6px; font-size: 13px; font-weight: 600; color: var(--destaque); background: var(--destaque-claro); border-color: var(--destaque-claro); }
   .kmover:hover { border-color: var(--destaque); }
   .ktransf { margin-top: 5px; color: var(--azul); background: var(--azul-claro); border-color: var(--azul-claro); }
@@ -340,10 +346,12 @@ function render() {
   if (tela.nome !== 'form' && tela.nome !== 'enviado') modoLink = false;
   document.getElementById('abas').hidden = modoLink;
   const abas = gestor() ? [['painel', 'Painel']] : [];
-  abas.push(['pre', 'Pré-atendimento'], ['funil', 'Funil de vendas'], ['lista', 'Imóveis'], ['ativ', 'Atividades'], ['pontos', 'Pontuação'], ['comissao', 'Comissão']);
+  abas.push(['fila', 'Fila do dia'], ['pre', 'Pré-atendimento'], ['funil', 'Funil de vendas'], ['nut', 'Nutrição'], ['lista', 'Imóveis'], ['ativ', 'Atividades'], ['pontos', 'Pontuação'], ['comissao', 'Comissão']);
   if (gestor()) { const n = DB.imoveis.filter(i => i.status === 'aguardando').length + POSSE.length; abas.push(['aprovacao', n ? `Aprovação 🔔 ${n}` : 'Aprovação (0)']); }
   const leadAberto = tela.nome === 'lead' ? FUN.leads.find(x => x.id === tela.id) : null;
-  const atual = tela.nome === 'painel' ? 'painel' : tela.nome === 'comissao' ? 'comissao' : tela.nome === 'pontos' ? 'pontos' : tela.nome === 'ativ' ? 'ativ' : tela.nome === 'pre' || (leadAberto && noPre(leadAberto)) ? 'pre' : ['funil', 'lead', 'novolead'].includes(tela.nome) ? 'funil' : tela.nome === 'aprovacao' ? 'aprovacao' : 'lista';
+  const atual = leadAberto ? (tela.de || abaDoLead(leadAberto))
+    : ['painel', 'comissao', 'pontos', 'ativ', 'pre', 'fila', 'nut', 'aprovacao'].includes(tela.nome) ? tela.nome
+    : ['funil', 'lead', 'novolead'].includes(tela.nome) ? 'funil' : 'lista';
   document.getElementById('abas').innerHTML = abas.map(([k, t]) => `<button data-aba="${k}" class="${atual === k ? 'on' : ''}">${t}</button>`).join('');
   const app = document.getElementById('app');
   if (tela.nome === 'lista') app.innerHTML = telaLista();
@@ -353,6 +361,8 @@ function render() {
   else if (tela.nome === 'enviado') app.innerHTML = telaEnviado();
   else if (tela.nome === 'funil') app.innerHTML = telaFunil('vendas');
   else if (tela.nome === 'pre') app.innerHTML = telaFunil('pre');
+  else if (tela.nome === 'nut') app.innerHTML = telaFunil('nut');
+  else if (tela.nome === 'fila') app.innerHTML = telaFila();
   else if (tela.nome === 'painel') { app.innerHTML = telaPainel(); if (!PNL.dados) carregarPainel(); }
   else if (tela.nome === 'comissao') { app.innerHTML = telaComissao(); if (!COM.carregado) carregarComissao(); }
   else if (tela.nome === 'pontos') { app.innerHTML = telaPontos(); if (!PTS.carregado) carregarPontos(); }
@@ -894,15 +904,17 @@ document.addEventListener('click', e => {
   if (b.dataset.meus !== undefined) { modoLink = false; history.replaceState(null, '', location.pathname); tela = { nome: 'lista' }; render(); }
 });
 // ---------- funis: Pré-atendimento (SDR) e Funil de vendas (funil "Atendimento" do CRM Leads) ----------
-const FUN = { cfg: null, pre: null, sdrs: [], fases: [], status: [], leads: [], busca: '', corretor: '' };
+const FUN = { cfg: null, pre: null, nut: null, sdrs: [], fases: [], status: [], leads: [], busca: '', corretor: '', recad: {} };
 async function carregarFunil() {
   const { data: cs } = await db.from('crm_vendas_config').select('chave, valor').in('chave', ['funil_vendas', 'funil_pre', 'sdrs']);
   const c = Object.fromEntries((cs || []).map(x => [x.chave, x.valor]));
   if (!c.funil_vendas) { aviso('Funil de vendas não configurado.', true); return; }
   FUN.cfg = c.funil_vendas; FUN.pre = c.funil_pre || null; FUN.sdrs = c.sdrs || [];
-  const funis = [FUN.cfg.funil, FUN.pre?.funil].filter(Boolean);
-  const [f, st, ld] = await Promise.all([
-    db.from('fases').select('id, nome, ordem, funil_id').order('ordem'),
+  const f = await db.from('fases').select('id, nome, ordem, funil_id').order('ordem');
+  // Funil de nutrição = funil da fase "Hibernado" (funil_pre.nutricao).
+  FUN.nut = (f.data || []).find(x => x.id === FUN.pre?.nutricao)?.funil_id || null;
+  const funis = [FUN.cfg.funil, FUN.pre?.funil, FUN.nut].filter(Boolean);
+  const [st, ld] = await Promise.all([
     db.from('crm_vendas_status').select('*').eq('ativo', true).order('ordem'),
     db.from('leads').select('id, nome, telefone, email, origem, campanha, codigo_imovel, corretor_id, fase_id, funil_id, fase_atualizada_em, valor_negociacao, created_at').in('funil_id', funis).order('fase_atualizada_em', { ascending: false }).limit(3000),
   ]);
@@ -911,18 +923,20 @@ async function carregarFunil() {
   // Avisos de prazo (mesma regra que vai para a pontuação): fica o mais grave de cada lead.
   const { data: al } = await db.rpc('crm_vendas_alertas');
   FUN.alerta = {};
-  const peso = (a) => (a.nivel === 'vermelho' ? 10 : 0) + ({ retorno: 4, feedback: 3, followup: 2, parado: 1 }[a.tipo] || 0);
+  const peso = (a) => (a.nivel === 'vermelho' ? 10 : 0) + ({ transferencia: 5, retorno: 4, feedback: 3, followup: 2, parado: 1 }[a.tipo] || 0);
   (al || []).forEach(a => { const atual = FUN.alerta[a.lead_id]; if (!atual || peso(a) > peso(atual)) FUN.alerta[a.lead_id] = a; });
   const ids = FUN.leads.map(l => l.id);
-  FUN.ultimo = {};
+  FUN.ultimo = {}; FUN.recad = {};
   const marca = (id, quando, tipo) => { const u = FUN.ultimo[id]; if (!u || new Date(quando) > new Date(u.quando)) FUN.ultimo[id] = { quando, tipo }; };
+  // "Novo cadastro" é o aviso automático de que o lead se cadastrou de novo: não é contato do corretor.
+  const recad = (id, quando) => { if (!FUN.recad[id] || new Date(quando) > new Date(FUN.recad[id])) FUN.recad[id] = quando; };
   for (let i = 0; i < ids.length; i += 200) {
     const parte = ids.slice(i, i + 200);
     const [it, mv] = await Promise.all([
       db.from('interacoes').select('lead_id, tipo, created_at').in('lead_id', parte),
       db.from('crm_vendas_movimentos').select('lead_id, quando, extras').in('lead_id', parte),
     ]);
-    (it.data || []).forEach(x => marca(x.lead_id, dataUTC(x.created_at), x.tipo));
+    (it.data || []).forEach(x => x.tipo === 'Novo cadastro' ? recad(x.lead_id, dataUTC(x.created_at)) : marca(x.lead_id, dataUTC(x.created_at), x.tipo));
     (mv.data || []).forEach(x => { if (x.extras && x.extras.contato) marca(x.lead_id, x.quando, x.extras.contato); });
   }
 }
@@ -932,6 +946,7 @@ function alertaTxt(a) {
   if (a.tipo === 'retorno') return a.nivel === 'vermelho' ? `Atrasado: lead novo sem retorno há ${h}h` : `Lead novo: responda em até ${Math.max(1, 24 - h)}h`;
   if (a.tipo === 'feedback') return a.nivel === 'vermelho' ? `Atrasado: feedback da visita (${d >= 1 ? d + 'd' : h + 'h'})` : `Visita passou: registre o resultado (vence em ${Math.max(1, 24 - h)}h)`;
   if (a.tipo === 'followup') return a.nivel === 'vermelho' ? `Atrasado: follow-up da visita (${h}h)` : `Follow-up vence em ${Math.max(1, 36 - h)}h`;
+  if (a.tipo === 'transferencia') return a.nivel === 'vermelho' ? `Atrasado: recebido por transferência há ${h}h sem contato` : 'Recebido por transferência: faça o 1º contato';
   return a.nivel === 'vermelho' ? `Atrasado: sem contato há ${d} dias` : `Sem contato há ${d} dias: faça contato até amanhã`;
 }
 const CONTATOS = ['WhatsApp', 'Ligação', 'Visita', 'E-mail', 'Instagram', 'Presencial'];
@@ -948,15 +963,35 @@ function ultimoTxt(id) {
 }
 const faseNome = (id) => FUN.fases.find(f => f.id === id)?.nome || '—';
 const noPre = (l) => FUN.pre && l.funil_id === FUN.pre.funil;
+const noNut = (l) => FUN.nut && l.funil_id === FUN.nut;
+const abaDoLead = (l) => (noPre(l) ? 'pre' : noNut(l) ? 'nut' : 'funil');
+// Nutrição "N dias": o retorno vence N dias depois que o lead entrou na coluna. Hibernado não tem data.
+function retornoNut(l) {
+  if (!noNut(l)) return null;
+  const dias = parseInt((faseNome(l.fase_id).match(/^(\d+) dias$/) || [])[1], 10);
+  if (!dias || !l.fase_atualizada_em) return null;
+  const quando = new Date(new Date(l.fase_atualizada_em).getTime() + dias * 86400000);
+  return { quando, vencido: quando <= new Date() };
+}
+const hojeBR = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+const diaBR = (ts) => new Date(ts).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+const contatadoHoje = (id) => { const u = (FUN.ultimo || {})[id]; return !!u && diaBR(u.quando) === hojeBR(); };
+// Voltou a se cadastrar nos últimos 30 dias e ninguém falou com ele depois disso.
+const recadPendente = (id) => { const r = FUN.recad?.[id]; if (!r || Date.now() - new Date(r) > 30 * 86400000) return null; const u = FUN.ultimo?.[id]; return !u || new Date(r) > new Date(u.quando) ? r : null; };
 const eSdr = (corretorId) => FUN.sdrs.includes(corretorId);
 // Transferir: lead do SDR (ou qualquer lead, para o gestor) em "Em atendimento" ou "Agendamento de visita".
 const podeTransferir = (l) => [FUN.cfg.atendimento, FUN.cfg.agendamento].includes(l.fase_id) && (gestor() || eSdr(l.corretor_id));
 const diasDesde = (ts) => ts ? Math.max(0, Math.floor((Date.now() - new Date(ts)) / 86400000)) : null;
-function cardLead(l) {
+function cardLead(l, comEtapa) {
   const u = ultimoTxt(l.id);
   const a = FUN.alerta?.[l.id], at = alertaTxt(a);
-  return `<div class="kcard ${a ? (a.nivel === 'vermelho' ? 'katrasado' : 'kamarelo') : ''}" data-lead="${l.id}">
+  const rc = recadPendente(l.id), rn = retornoNut(l);
+  const dm = (d) => new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  return `<div class="kcard ${a ? (a.nivel === 'vermelho' ? 'katrasado' : 'kamarelo') : rn?.vencido ? 'kamarelo' : ''}" data-lead="${l.id}">
     ${at ? `<div class="kaviso">${esc(at)}</div>` : ''}
+    ${rc ? `<div class="kaviso" style="color:var(--azul)">🔁 Voltou a se cadastrar em ${dm(rc)}</div>` : ''}
+    ${rn ? `<div class="kaviso">${rn.vencido ? `💤 Retorno venceu em ${dm(rn.quando)}` : `<span style="color:var(--suave)">💤 Retorno em ${dm(rn.quando)}</span>`}</div>` : ''}
+    ${comEtapa ? `<div class="s" style="color:var(--suave);margin-bottom:4px">${esc(faseNome(l.fase_id))}</div>` : ''}
     <div class="ktopo"><span class="kav">${esc(iniciais(l.nome))}</span><b>${esc(l.nome || 'Sem nome')}</b></div>
     ${l.telefone ? `<div class="ktel">☏ ${esc(l.telefone)} <button class="kcopia" data-copiar="${esc(l.telefone)}" title="Copiar telefone" aria-label="Copiar telefone">⧉</button></div>` : ''}
     <div class="selos"><span class="selo vinho">${esc(l.origem || 'Sem origem')}</span>${l.codigo_imovel ? `<span class="selo">Cód. ${esc(l.codigo_imovel)}</span>` : ''}${l.valor_negociacao ? `<span class="selo">${brl(l.valor_negociacao)}</span>` : ''}</div>
@@ -968,16 +1003,18 @@ function cardLead(l) {
 }
 function telaFunil(modo) {
   if (!FUN.cfg) return '<div class="vazio">Carregando o funil…</div>';
-  const pre = modo === 'pre';
+  const pre = modo === 'pre', nut = modo === 'nut';
   if (pre && !FUN.pre) return '<div class="vazio">Funil de pré-atendimento não configurado.</div>';
-  const funilId = pre ? FUN.pre.funil : FUN.cfg.funil;
+  if (nut && !FUN.nut) return '<div class="vazio">Funil de nutrição não configurado.</div>';
+  const funilId = pre ? FUN.pre.funil : nut ? FUN.nut : FUN.cfg.funil;
   const fasesFunil = FUN.fases.filter(f => f.funil_id === funilId);
-  const q = FUN.busca.toLowerCase().replace(/\D/g, '') || FUN.busca.toLowerCase();
-  const filtrados = FUN.leads.filter(l => l.funil_id === funilId && (!FUN.soAtrasados || FUN.alerta?.[l.id]?.nivel === 'vermelho') && (!FUN.corretor || l.corretor_id === FUN.corretor) &&
-    (!FUN.busca || [l.nome, l.telefone, l.codigo_imovel, l.origem].join(' ').toLowerCase().includes(FUN.busca.toLowerCase()) || (q && String(l.telefone || '').replace(/\D/g, '').includes(q))));
+  // Na nutrição, "atrasado" = retorno vencido.
+  const atrasado = (l) => nut ? !!retornoNut(l)?.vencido : FUN.alerta?.[l.id]?.nivel === 'vermelho';
+  const filtrados = FUN.leads.filter(l => l.funil_id === funilId && (!FUN.soAtrasados || atrasado(l)) && passaFiltro(l));
   const col = (f, sub) => { const ls = filtrados.filter(l => l.fase_id === f.id);
-    const nAtr = ls.filter(l => FUN.alerta?.[l.id]?.nivel === 'vermelho').length;
-    return `<div class="kcol"><div class="khead"><span>${esc(f.nome)}</span><span style="color:var(--suave)">${ls.length}${nAtr ? ` · <span style="color:var(--vermelho)">${nAtr} atrasado${nAtr > 1 ? 's' : ''}</span>` : ''}</span></div>${ls.slice(0, 80).map(cardLead).join('')}${ls.length > 80 ? `<div class="s" style="text-align:center">+${ls.length - 80} leads</div>` : ''}</div>`; };
+    if (nut) ls.sort((a, b) => (retornoNut(a)?.quando || 0) - (retornoNut(b)?.quando || 0));
+    const nAtr = ls.filter(atrasado).length;
+    return `<div class="kcol"><div class="khead"><span>${esc(f.nome)}</span><span style="color:var(--suave)">${ls.length}${nAtr ? ` · <span style="color:var(--vermelho)">${nAtr} ${nut ? 'vencido' : 'atrasado'}${nAtr > 1 ? 's' : ''}</span>` : ''}</span></div>${ls.slice(0, 80).map(l => cardLead(l)).join('')}${ls.length > 80 ? `<div class="s" style="text-align:center">+${ls.length - 80} leads</div>` : ''}</div>`; };
   const c = FUN.cfg;
   let html = '';
   for (const f of fasesFunil) {
@@ -988,14 +1025,55 @@ function telaFunil(modo) {
       html += `<div class="kgrp"><div class="khead"><span>Visita</span><span style="color:var(--suave)">${n}</span></div><div class="sub">${col(fv)}${fn ? col(fn) : ''}</div></div>`;
     } else html += col(f);
   }
+  const fim = pre ? `<span class="s" style="margin-left:auto;color:var(--suave)">${FUN.sdrs.length ? 'Pré-atendimento do SDR' : 'Ainda sem SDR: cada corretor faz o pré-atendimento dos próprios leads'}</span>`
+    : nut ? '<span class="s" style="margin-left:auto;color:var(--suave)">O retorno vence N dias depois que o lead entra na coluna · Hibernado não tem data</span>'
+    : '<button class="principal" data-novolead style="margin-left:auto">+ Novo lead</button>';
+  return `${barraFiltros(funilId, nut ? 'Só vencidos' : 'Só atrasados', atrasado, fim)}
+    <div class="kanban">${html}</div>`;
+}
+// Fila do dia: o que fazer hoje, separado por funil e na ordem de urgência.
+// Some da fila quem já teve contato registrado hoje (menos quem tem aviso de atraso).
+function telaFila() {
+  if (!FUN.cfg) return '<div class="vazio">Carregando a fila…</div>';
+  const c = FUN.cfg, p = FUN.pre || {};
+  const ls = FUN.leads.filter(passaFiltro);
+  const t = (l) => new Date(l.created_at).getTime();
+  const ult = (l) => FUN.ultimo?.[l.id] ? new Date(FUN.ultimo[l.id].quando).getTime() : 0;
+  const nivel = (l) => ({ vermelho: 2, amarelo: 1 }[FUN.alerta?.[l.id]?.nivel] || 0);
+  const pendente = (l) => !contatadoHoje(l.id) || nivel(l) > 0;
+  const voltou = ls.filter(l => recadPendente(l.id));
+  const novos = ls.filter(l => l.fase_id === p.novo && pendente(l) && !recadPendente(l.id)).sort((a, b) => t(b) - t(a));
+  const contatos = [p.c1, p.c2, p.c3, p.c4, p.c5];
+  const retornos = ls.filter(l => contatos.includes(l.fase_id) && pendente(l) && !recadPendente(l.id)).sort((a, b) => nivel(b) - nivel(a) || ult(a) - ult(b));
+  const abertos = [c.novo, c.atendimento, c.agendamento, c.visita, c.noshow, c.proposta];
+  const atend = ls.filter(l => abertos.includes(l.fase_id) && pendente(l) && !recadPendente(l.id)).sort((a, b) => nivel(b) - nivel(a) || ult(a) - ult(b));
+  const nutri = ls.filter(l => retornoNut(l)?.vencido && !recadPendente(l.id)).sort((a, b) => retornoNut(a).quando - retornoNut(b).quando);
+  const sec = (titulo, dica, lista) => `<div class="fsec"><div class="khead"><span>${titulo}</span><span style="color:var(--suave)">${lista.length}</span></div>
+    ${dica ? `<div class="dica">${dica}</div>` : ''}
+    ${lista.length ? `<div class="fgrid">${lista.slice(0, 60).map(l => cardLead(l, true)).join('')}</div>${lista.length > 60 ? `<div class="fmais">+${lista.length - 60} leads (use a busca ou o filtro para achar)</div>` : ''}` : '<div class="s" style="color:var(--suave)">Nada aqui hoje.</div>'}</div>`;
+  const total = voltou.length + novos.length + retornos.length + atend.length + nutri.length;
+  return `${barraFiltros(null, '', null, `<span class="s" style="margin-left:auto;color:var(--suave)">${total} lead${total === 1 ? '' : 's'} para hoje · quem tem contato registrado hoje sai da fila</span>`)}
+    ${voltou.length ? sec('🔁 Voltaram a se cadastrar', 'Lead que se cadastrou de novo e ainda não teve contato depois disso.', voltou) : ''}
+    ${sec('🆕 Novos leads · Pré-atendimento', 'Os mais recentes primeiro: fale enquanto o interesse está quente.', novos)}
+    ${sec('📞 Retornos · Pré-atendimento (1º ao 5º contato)', 'Atrasados primeiro; depois quem está há mais tempo sem contato.', retornos)}
+    ${sec('🤝 Em atendimento · Funil de vendas', 'Atrasados primeiro (transferência, visita, follow-up); depois quem está há mais tempo sem contato.', atend)}
+    ${sec('💤 Nutrição · retorno vencido', 'O retorno mais antigo primeiro.', nutri)}`;
+}
+// Busca e filtro de corretor (gestor), usados no funil e na fila do dia.
+function passaFiltro(l) {
+  const q = FUN.busca.toLowerCase().replace(/\D/g, '');
+  return (!FUN.corretor || l.corretor_id === FUN.corretor) &&
+    (!FUN.busca || [l.nome, l.telefone, l.codigo_imovel, l.origem].join(' ').toLowerCase().includes(FUN.busca.toLowerCase()) || (q && String(l.telefone || '').replace(/\D/g, '').includes(q)));
+}
+function barraFiltros(funilId, rotuloAtrasados, atrasado, fim) {
+  const doFunil = (l) => !funilId || l.funil_id === funilId;
   const corrs = [...new Set(FUN.leads.map(l => l.corretor_id).filter(Boolean))].map(id => [id, CORRETORES[id] || 'Sem nome']).sort((a, b) => a[1].localeCompare(b[1]));
   return `<div class="barra">
       <input id="fbusca" placeholder="Buscar nome, telefone ou código" value="${esc(FUN.busca)}">
-      <button data-soatrasados class="${FUN.soAtrasados ? 'principal' : ''}">${FUN.soAtrasados ? '✓ ' : ''}Só atrasados (${FUN.leads.filter(l => l.funil_id === funilId && FUN.alerta?.[l.id]?.nivel === 'vermelho').length})</button>
-      ${gestor() ? `<select id="fcorretor"><option value="">Todos os corretores</option>${corrs.map(([id, n]) => `<option value="${id}" ${FUN.corretor === id ? 'selected' : ''}>${esc(n)}${eSdr(id) ? ' (SDR)' : ''}${(() => { const k = FUN.leads.filter(l => l.funil_id === funilId && l.corretor_id === id && FUN.alerta?.[l.id]?.nivel === 'vermelho').length; return k ? ` · ${k} atrasados` : ''; })()}</option>`).join('')}</select>` : ''}
-      ${pre ? `<span class="s" style="margin-left:auto;color:var(--suave)">${FUN.sdrs.length ? 'Pré-atendimento do SDR' : 'Ainda sem SDR: cada corretor faz o pré-atendimento dos próprios leads'}</span>` : '<button class="principal" data-novolead style="margin-left:auto">+ Novo lead</button>'}
-    </div>
-    <div class="kanban">${html}</div>`;
+      ${atrasado ? `<button data-soatrasados class="${FUN.soAtrasados ? 'principal' : ''}">${FUN.soAtrasados ? '✓ ' : ''}${rotuloAtrasados} (${FUN.leads.filter(l => doFunil(l) && atrasado(l)).length})</button>` : ''}
+      ${gestor() ? `<select id="fcorretor"><option value="">Todos os corretores</option>${corrs.map(([id, n]) => `<option value="${id}" ${FUN.corretor === id ? 'selected' : ''}>${esc(n)}${eSdr(id) ? ' (SDR)' : ''}${(() => { const k = atrasado ? FUN.leads.filter(l => doFunil(l) && l.corretor_id === id && atrasado(l)).length : 0; return k ? ` · ${k} ${rotuloAtrasados.replace('Só ', '')}` : ''; })()}</option>`).join('')}</select>` : ''}
+      ${fim || ''}
+    </div>`;
 }
 function telaLead() {
   const l = FUN.leads.find(x => x.id === tela.id);
@@ -1003,12 +1081,12 @@ function telaLead() {
   const atual = l.fase_id;
   const grupos = FUN.fases.filter(f => f.id !== atual && FUN.status.some(s => s.fase_id === f.id));
   const tel = String(l.telefone || '').replace(/\D/g, '');
-  return `<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap"><button data-voltarfunil>← Voltar para o ${noPre(l) ? 'pré-atendimento' : 'funil'}</button>${podeTransferir(l) ? `<button data-transferir="${l.id}">⇄ Transferir atendimento</button>` : ''}</div>
+  return `<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap"><button data-voltarfunil>← Voltar para ${{ fila: 'a fila do dia', pre: 'o pré-atendimento', nut: 'a nutrição', funil: 'o funil' }[tela.de || abaDoLead(l)]}</button>${podeTransferir(l) ? `<button data-transferir="${l.id}">⇄ Transferir atendimento</button>` : ''}</div>
   <div class="det">
     <div class="card">
       <h2 style="margin:0">${esc(l.nome || 'Sem nome')}</h2>
       ${FUN.alerta?.[l.id] ? `<div class="aviso" style="margin:8px 0;background:${FUN.alerta[l.id].nivel === 'vermelho' ? 'var(--vermelho-claro);color:var(--vermelho)' : 'var(--ambar-claro);color:var(--ambar)'}"><b>${esc(alertaTxt(FUN.alerta[l.id]))}</b></div>` : ''}
-      <div style="color:var(--suave);font-size:14px">${noPre(l) ? 'Pré-atendimento' : 'Funil de vendas'} · hoje em <b>${esc(faseNome(atual))}</b> · ${esc(CORRETORES[l.corretor_id] || 'Sem corretor')}${eSdr(l.corretor_id) ? ' (SDR)' : ''}</div>
+      <div style="color:var(--suave);font-size:14px">${noPre(l) ? 'Pré-atendimento' : noNut(l) ? 'Nutrição' : 'Funil de vendas'} · hoje em <b>${esc(faseNome(atual))}</b> · ${esc(CORRETORES[l.corretor_id] || 'Sem corretor')}${eSdr(l.corretor_id) ? ' (SDR)' : ''}</div>
       <div class="bloco" style="margin-top:12px">
         <div class="linha"><span>Telefone</span><span>${esc(l.telefone || '—')}${tel ? ` · <a href="https://wa.me/${tel.length <= 11 ? '55' + tel : tel}" target="_blank" style="color:var(--azul)">WhatsApp</a>` : ''}</span></div>
         <div class="linha"><span>Origem</span><span>${esc(l.origem || '—')}${l.campanha ? ' · ' + esc(l.campanha) : ''}</span></div>
@@ -1026,13 +1104,21 @@ function telaLead() {
   </div>`;
 }
 function statusPossiveis(l) {
-  const pre = noPre(l);
+  const pre = noPre(l), nut = noNut(l);
   const atual = FUN.fases.find(f => f.id === l.fase_id);
   return FUN.status.filter(s => {
-    if (pre ? s.origem === 'vendas' : s.origem === 'pre') return false;
+    // Pré-atendimento e nutrição usam os status do pré; o funil de vendas, os de venda (mesma regra de crm_vendas_mover_lead).
+    if ((pre || nut) && s.origem === 'vendas') return false;
+    if (!pre && !nut && s.origem === 'pre') return false;
+    // "Retornar em N dias" aparece para o pré, a nutrição, os leads da SDR e o gestor.
+    if (s.origem === 'nutricao' && !(pre || nut || eSdr(l.corretor_id) || gestor())) return false;
     if (s.tipo === 'contato') return true;
     if (s.fase_id === l.fase_id) return false;
-    if (s.tipo === 'contato_feito') { const f = FUN.fases.find(x => x.id === s.fase_id); return f && atual && f.ordem === atual.ordem + 1; }
+    if (s.tipo === 'contato_feito') {
+      // Saindo da nutrição, a tentativa de contato volta para o "1º contato".
+      if (nut) return s.fase_id === FUN.pre?.c1;
+      const f = FUN.fases.find(x => x.id === s.fase_id); return f && atual && f.ordem === atual.ordem + 1;
+    }
     return true;
   });
 }
@@ -1040,7 +1126,11 @@ function formMover(l) {
   const sts = statusPossiveis(l);
   const ordemFunil = (f) => (FUN.pre && f.funil_id === FUN.pre.funil ? 0 : f.funil_id === FUN.cfg.funil ? 1 : 2) * 100 + f.ordem;
   const grupos = FUN.fases.filter(f => sts.some(s => s.fase_id === f.id)).sort((a, b) => ordemFunil(a) - ordemFunil(b));
-  const nomeFase = (f) => (noPre(l) && f.funil_id === FUN.cfg.funil) ? f.nome + ' (funil de vendas)' : (FUN.pre && f.funil_id !== FUN.pre.funil && f.funil_id !== FUN.cfg.funil) ? f.nome + ' (nutrição)' : f.nome;
+  // Fase do mesmo funil do lead aparece sem rótulo; as outras dizem de qual funil são (a nutrição sempre).
+  const nomeFase = (f) => {
+    const onde = FUN.pre && f.funil_id === FUN.pre.funil ? 'pré-atendimento' : f.funil_id === FUN.cfg.funil ? 'funil de vendas' : 'nutrição';
+    return f.funil_id === l.funil_id && onde !== 'nutrição' ? f.nome : `${f.nome} (${onde})`;
+  };
   return `<div class="q"><label for="mstatus">Status *</label>
       <select id="mstatus"><option value="">Selecione o status</option><optgroup label="Continua em ${esc(faseNome(l.fase_id))}">${sts.filter(s => s.tipo === 'contato').map(s => `<option value="${s.id}">${esc(s.nome)}</option>`).join('')}</optgroup>${grupos.map(f => `<optgroup label="${esc(nomeFase(f))}">${sts.filter(s => s.fase_id === f.id).map(s => `<option value="${s.id}">${esc(s.nome)}${s.tipo === 'perdido' || s.tipo === 'descartado' ? ' (' + esc(f.nome) + ')' : ''}</option>`).join('')}</optgroup>`).join('')}</select>
       <div class="dica" id="mdest"></div></div>
@@ -1154,12 +1244,12 @@ document.addEventListener('click', async e => {
     aviso('Atendimento transferido para ' + (CORRETORES[cor] || 'o corretor') + '.');
     fecharModal();
     await carregarFunil();
-    if (tela.nome === 'lead' && !FUN.leads.some(x => x.id === tela.id)) tela = { nome: 'funil' };
+    if (tela.nome === 'lead' && !FUN.leads.some(x => x.id === tela.id)) tela = { nome: tela.de || 'funil' };
     render();
   }
   else if (ds.fecharmodal !== undefined) fecharModal();
-  else if (ds.lead) { tela = { nome: 'lead', id: ds.lead }; render(); }
-  else if (ds.voltarfunil !== undefined) { const l = FUN.leads.find(x => x.id === tela.id); tela = { nome: l && noPre(l) ? 'pre' : 'funil' }; render(); }
+  else if (ds.lead) { tela = { nome: 'lead', id: ds.lead, de: ['fila', 'pre', 'nut', 'funil'].includes(tela.nome) ? tela.nome : null }; render(); }
+  else if (ds.voltarfunil !== undefined) { const l = FUN.leads.find(x => x.id === tela.id); tela = { nome: tela.de || (l ? abaDoLead(l) : 'funil') }; render(); }
   else if (ds.novolead !== undefined) { tela = { nome: 'novolead' }; render(); }
   else if (ds.mover) {
     const st = document.getElementById('mstatus').value, obs = document.getElementById('mobs').value.trim();
@@ -1190,7 +1280,7 @@ document.addEventListener('click', async e => {
     fecharModal();
     const abaAntes = tela.nome;
     await carregarFunil();
-    if (doModal) tela = { nome: abaAntes === 'pre' ? 'pre' : 'funil' };
+    if (doModal) tela = { nome: ['pre', 'fila', 'nut'].includes(abaAntes) ? abaAntes : 'funil' };
     else if (tela.nome === 'lead' && !FUN.leads.some(x => x.id === tela.id)) tela = { nome: 'funil' };
     render();
   }

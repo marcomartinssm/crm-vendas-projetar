@@ -26,6 +26,38 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 - Aba "Pré-atendimento" = funil "Pré Atendimento" do CRM Leads (`crm_vendas_config.funil_pre`). `crm_vendas_status.origem` diz em que funil cada status aparece (vendas / pre / ambos).
 - `crm_vendas_config.sdrs` = ids de corretores que são SDR (vazio até contratar). Botão "Transferir atendimento" aparece para leads de SDR em "Em atendimento" ou "Agendamento de visita" (e para o gestor). Função `crm_vendas_transferir`; sugestão do agenciador: `crm_vendas_sugerir_corretor`.
 - Ao contratar o SDR: cadastrar como corretor + login (usuarios_corretores), incluir o id em `sdrs` e em `participantes`.
+- SDR atual (22/10/2026): Carolini Labes. Recebeu todos os leads da Pamela e os Hibernados de Meta Ads da Projetar Imóveis (58, registrados em `crm_vendas_movimentos` como `transferencia`).
+
+## Histórico dos leads
+- `crm_vendas_leads_historico` — gatilho `zz_crm_vendas_historico_lead` em `leads` grava toda criação e toda mudança de fase/funil/corretor, venha de onde vier (CRM Leads, CRM Vendas, automações), com `por` = usuário logado. O CRM Leads não guardava isso.
+- Linhas com `origem = 'reconstruido'`: o que a Carol fez em 22–23/10, antes do gatilho existir (só a última mudança de cada lead).
+
+## Relatórios da SDR no WhatsApp (mesmo modelo do CRM Aluguel)
+- Números: `crm_vendas_sdr_resumo(inicio, fim, corretor)` (só service_role). "Mexer" no lead = interação registrada (`interacoes`, menos "Novo cadastro"), mudança de etapa feita por ela ou movimento no CRM Vendas.
+- Mostra: leads trabalhados, contatos por tipo, mudanças de etapa e avanços, respostas (chegaram em Em atendimento), visitas agendadas, nutrição, descartes, passados para corretor, leads novos e tempo até o 1º contato, conversões, carteira agora por fase, nunca mexidos, novos esperando, parados 3+/7+ dias e o que aconteceu depois com os leads que passaram por ela.
+- Edge function `crm-vendas-relatorio` (código em `supabase/functions/crm-vendas-relatorio/index.ts`, verify_jwt desligado, protegida por `?token=`). Token, instância e grupo em `crm_vendas_relatorio_config` (tabela só do servidor; o token também em `.token` nesta pasta, fora do git).
+- Testar sem enviar: `POST .../functions/v1/crm-vendas-relatorio?token=...&acao=relatorio&tipo=dia&teste=1`. Reenviar: `&forcar=1`. Grupos do número: `GET ...&acao=grupos&instancia=Seguralta`.
+- Envia pela instância Seguralta para o grupo **Pré-atendimento Projetar** (id em `crm_vendas_relatorio_config.grupo`). O número precisa estar no grupo.
+- **Diário:** seg–sex 18h30 (o dia de hoje). **Semanal:** sábado 9h (sábado a sexta). **Mensal:** dia 1 às 8h05 (mês anterior). pg_cron `crm-vendas-relatorio-*` → `crm_vendas_chamar_relatorio(tipo)`.
+- Cada envio fica em `crm_vendas_relatorios` (não manda duas vezes o mesmo período).
+
+## Fila do dia (aba "Fila do dia")
+- O que fazer hoje, por funil e em ordem de urgência: 🔁 voltaram a se cadastrar (últimos 30 dias, sem contato depois) → 🆕 novos do pré (mais recentes primeiro) → 📞 retornos do pré (1º ao 5º contato; atrasados e depois o contato mais antigo) → 🤝 em atendimento no funil de vendas (atrasados primeiro) → 💤 nutrição com retorno vencido.
+- Quem tem contato registrado hoje sai da fila (menos quem tem aviso de atraso). Tudo calculado na tela (`telaFila` em `index.html`).
+- Prazos por tentativa de contato e rapidez com lead novo: ficam para depois (decisão do Marco, 26/10/2026).
+
+## Nutrição (aba "Nutrição")
+- Funil "Nutrição" do CRM Leads (Hibernado, 15 dias … 360 dias). O retorno vence N dias depois que o lead entrou na coluna (`fase_atualizada_em`); Hibernado não tem data.
+- Status `origem = 'nutricao'` em `crm_vendas_status`: "Retornar em N dias" (um por coluna). Aparecem para leads do pré, da nutrição, da SDR e para o gestor.
+- `crm_vendas_mover_lead`: lead na nutrição usa os status do pré e da nutrição (não os de venda). Saindo da nutrição, a tentativa de contato volta para o "1º contato".
+
+## Avisos no WhatsApp do corretor
+- Fila `crm_vendas_avisos`, preenchida por gatilhos: **transferência** (`crm_vendas_movimentos` tipo `transferencia` → aviso ao corretor que recebeu, com dados do lead, visita e recado) e **recadastro** (`interacoes` "Novo cadastro" → aviso ao corretor do lead). Sem telefone do corretor, vai para os gestores.
+- Sem aviso: lead passado para a SDR; troca de corretor direto em `leads` (não gera movimento); e lote feito por SQL com `select set_config('crm_vendas.sem_aviso', '1', true);` antes dos inserts (padrão quando o Claude faz transferência a pedido, salvo se pedirem o aviso).
+- Gestores que recebem os avisos: só o Marco (`avisos_gestores`, telefones separados por vírgula).
+- **Prazo da transferência:** `crm_vendas_config.prazo_transferencia_horas` (2). Em `crm_vendas_alertas()` o tipo `transferencia` fica amarelo até o prazo e vermelho depois (não vale para transferência para a SDR). Vencido → aviso ao corretor e aos gestores (`crm_vendas_relatorio_config.avisos_gestores`).
+- Envio: edge function `crm-vendas-relatorio?acao=avisos` (pg_cron `crm-vendas-avisos`, a cada 2 min), pela instância Seguralta, só dentro de `avisos_horario` (8-21, Brasília); fora disso espera. Aviso com mais de 2 dias na fila é descartado. Ver sem enviar: `&teste=1`.
+- "Novo cadastro" não conta mais como contato (nem no cartão, nem nos avisos de atraso).
 
 ## Atividades (aba "Atividades")
 - `crm_vendas_atividades` — visita de prospecção e visita a imóvel na planta (foto + check-in GPS + descrição), post no Instagram (link + vídeo/estático), avaliação no Google (link + cliente), contato de pós-venda.
