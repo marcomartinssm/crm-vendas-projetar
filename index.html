@@ -922,7 +922,7 @@ async function carregarFunil() {
       db.from('interacoes').select('lead_id, tipo, created_at').in('lead_id', parte),
       db.from('crm_vendas_movimentos').select('lead_id, quando, extras').in('lead_id', parte),
     ]);
-    (it.data || []).forEach(x => marca(x.lead_id, x.created_at, x.tipo));
+    (it.data || []).forEach(x => marca(x.lead_id, dataUTC(x.created_at), x.tipo));
     (mv.data || []).forEach(x => { if (x.extras && x.extras.contato) marca(x.lead_id, x.quando, x.extras.contato); });
   }
 }
@@ -935,6 +935,8 @@ function alertaTxt(a) {
   return a.nivel === 'vermelho' ? `Atrasado: sem contato há ${d} dias` : `Sem contato há ${d} dias: faça contato até amanhã`;
 }
 const CONTATOS = ['WhatsApp', 'Ligação', 'Visita', 'E-mail', 'Instagram', 'Presencial'];
+// interacoes.created_at é gravado em UTC sem fuso; sem o "Z" o navegador lê como horário de Brasília (3h de diferença).
+const dataUTC = (s) => s && !/(Z|[+-]\d\d:?\d\d)$/.test(s) ? s + 'Z' : s;
 const iniciais = (n) => String(n || '?').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join('') || '?';
 function ultimoTxt(id) {
   const u = (FUN.ultimo || {})[id];
@@ -1083,13 +1085,23 @@ function extrasMover(tipo) {
   return '';
 }
 async function historicoLead(id) {
-  const { data } = await db.from('crm_vendas_movimentos').select('*').eq('lead_id', id).order('quando', { ascending: false });
+  const [{ data: movs }, { data: ints }] = await Promise.all([
+    db.from('crm_vendas_movimentos').select('*').eq('lead_id', id),
+    db.from('interacoes').select('tipo, descricao, corretor_id, created_at').eq('lead_id', id),
+  ]);
   const el = document.getElementById('hist-lead'); if (!el) return;
+  // Interações do CRM Leads entram no histórico. Mover o lead aqui também grava uma interação no mesmo instante: essa fica de fora para não repetir.
+  const tempos = (movs || []).map(m => new Date(m.quando).getTime());
+  const data = [...(movs || []), ...(ints || []).map(i => ({ interacao: true, ...i, quando: dataUTC(i.created_at) }))
+    .filter(i => !tempos.some(t => Math.abs(t - new Date(i.quando).getTime()) < 2000))]
+    .sort((a, b) => new Date(b.quando) - new Date(a.quando));
   const extrasTxt = (x) => { const p = [];
     if (x.data_visita) p.push('visita ' + new Date(x.data_visita).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }));
     if (x.valor) p.push(brl(x.valor)); if (x.honorario) p.push('honorário ' + x.honorario + '%');
     if (x.codigo_imovel) p.push('Cód. ' + x.codigo_imovel); return p.length ? ' · ' + p.join(' · ') : ''; };
-  el.innerHTML = '<h3>Histórico</h3>' + ((data || []).map(m => `<div class="hist"><b>${m.status_tipo === 'transferencia' ? 'Transferência de atendimento' : m.de_fase && m.de_fase === m.para_fase ? 'Continua em ' + esc(faseNome(m.para_fase)) : (m.de_fase ? esc(faseNome(m.de_fase)) + ' → ' : '') + esc(faseNome(m.para_fase))}</b>
+  el.innerHTML = '<h3>Histórico</h3>' + (data.map(m => m.interacao ? `<div class="hist"><b>${esc(m.tipo || 'Interação')} <span class="selo">CRM Leads</span></b>
+    <div style="color:var(--suave)">${esc(m.descricao || '')}${m.corretor_id && CORRETORES[m.corretor_id] ? ' · ' + esc(CORRETORES[m.corretor_id]) : ''}</div>
+    <div style="color:var(--suave);font-size:12px">${new Date(m.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</div></div>` : `<div class="hist"><b>${m.status_tipo === 'transferencia' ? 'Transferência de atendimento' : m.de_fase && m.de_fase === m.para_fase ? 'Continua em ' + esc(faseNome(m.para_fase)) : (m.de_fase ? esc(faseNome(m.de_fase)) + ' → ' : '') + esc(faseNome(m.para_fase))}</b>
     <div style="color:var(--suave)">Status: "${esc(m.status_nome || '')}"${m.extras && m.extras.contato ? ' · ' + esc(m.extras.contato) : ''}${m.observacao ? ' · ' + esc(m.observacao) : ''}${esc(extrasTxt(m.extras || {}))}</div>
     <div style="color:var(--suave);font-size:12px">${new Date(m.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</div></div>`).join('') || '<div style="color:var(--suave);font-size:14px">Nenhuma movimentação registrada ainda. As mudanças de etapa feitas a partir de agora aparecem aqui.</div>');
 }
