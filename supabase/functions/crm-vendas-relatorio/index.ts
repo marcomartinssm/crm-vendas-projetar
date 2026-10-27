@@ -279,6 +279,7 @@ async function montarAviso(a: any, cfg: Record<string, string>, nomes: Record<st
   const gestores = String(cfg.avisos_gestores ?? "").split(",").map(numeroWhats).filter(Boolean) as string[];
   const corretor = nomes[a.corretor_id ?? l.corretor_id];
   const telCorretor = numeroWhats(corretor?.telefone);
+  const grupo = cfg.grupo || null; // mesmo grupo dos relatórios (id termina em @g.us)
   const { data: pz } = await db.from("crm_vendas_config").select("valor").eq("chave", "prazo_transferencia_horas").maybeSingle();
   const horas = Number(pz?.valor ?? 2);
 
@@ -300,15 +301,17 @@ async function montarAviso(a: any, cfg: Record<string, string>, nomes: Record<st
     const t = [`🔁 *Lead voltou a se cadastrar*`, "", fichaLead(l)];
     if (i?.descricao) t.push(`_${i.descricao}_`);
     t.push(`Com: ${corretor?.nome ?? "—"}`, "", "Chame o cliente e registre o contato no CRM Vendas:", LINK_CRM);
-    return { texto: t.join("\n"), para: telCorretor ? [telCorretor] : gestores };
+    // corretor + grupo do pré-atendimento (para a gestão acompanhar); sem nenhum dos dois, vai para os gestores
+    const para = [telCorretor, grupo].filter(Boolean) as string[];
+    return { texto: t.join("\n"), para: para.length ? para : gestores };
   }
 
-  // prazo vencido: corretor + gestores
+  // prazo vencido: corretor + gestores + grupo do pré-atendimento
   const desde = String(a.ref).split("@")[1];
   const h = desde ? Math.floor((Date.now() - new Date(desde).getTime()) / 3600000) : horas;
   const t = [`⚠️ *Prazo vencido — lead transferido sem contato*`, "", fichaLead(l),
     `Com: ${corretor?.nome ?? "—"} · transferido há ${h}h (prazo ${horas}h)`, "", "Registre o contato no CRM Vendas:", LINK_CRM];
-  return { texto: t.join("\n"), para: [...new Set([telCorretor, ...gestores].filter(Boolean) as string[])] };
+  return { texto: t.join("\n"), para: [...new Set([telCorretor, ...gestores, grupo].filter(Boolean) as string[])] };
 }
 
 async function processarAvisos(opcoes: { teste?: boolean }) {
