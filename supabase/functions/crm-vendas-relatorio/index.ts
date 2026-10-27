@@ -280,6 +280,8 @@ async function montarAviso(a: any, cfg: Record<string, string>, nomes: Record<st
   const corretor = nomes[a.corretor_id ?? l.corretor_id];
   const telCorretor = numeroWhats(corretor?.telefone);
   const grupo = cfg.grupo || null; // mesmo grupo dos relatórios (id termina em @g.us)
+  // Todo aviso vai para o grupo do pré-atendimento (centro das notificações), para o corretor envolvido e para os gestores no privado, se houver.
+  const destinos = (tel: string | null) => [...new Set([tel, ...gestores, grupo].filter(Boolean) as string[])];
   const { data: pz } = await db.from("crm_vendas_config").select("valor").eq("chave", "prazo_transferencia_horas").maybeSingle();
   const horas = Number(pz?.valor ?? 2);
 
@@ -288,12 +290,12 @@ async function montarAviso(a: any, cfg: Record<string, string>, nomes: Record<st
     const { data: ag } = await db.from("crm_vendas_movimentos").select("extras").eq("lead_id", a.lead_id).eq("status_tipo", "agendamento")
       .order("quando", { ascending: false }).limit(1).maybeSingle();
     const de = nomes[m?.extras?.de_corretor]?.nome;
-    const t = [`📲 *Lead transferido para você*`, "", fichaLead(l)];
+    const t = [`📲 *Lead transferido*`, "", fichaLead(l)];
     if (ag?.extras?.data_visita) t.push(`📅 Visita: ${dataHora(ag.extras.data_visita)}`);
     if (de) t.push(`Passado por: ${de}`);
     if (m?.observacao) t.push(`📝 ${m.observacao}`);
-    t.push("", `⏱️ Faça o 1º contato em até ${horas}h e registre no CRM Vendas:`, LINK_CRM);
-    return { texto: t.join("\n"), para: telCorretor ? [telCorretor] : gestores };
+    t.push(`Para: *${corretor?.nome ?? "—"}*`, "", `⏱️ Faça o 1º contato em até ${horas}h e registre no CRM Vendas:`, LINK_CRM);
+    return { texto: t.join("\n"), para: destinos(telCorretor) };
   }
 
   if (a.tipo === "recadastro") {
@@ -301,17 +303,15 @@ async function montarAviso(a: any, cfg: Record<string, string>, nomes: Record<st
     const t = [`🔁 *Lead voltou a se cadastrar*`, "", fichaLead(l)];
     if (i?.descricao) t.push(`_${i.descricao}_`);
     t.push(`Com: ${corretor?.nome ?? "—"}`, "", "Chame o cliente e registre o contato no CRM Vendas:", LINK_CRM);
-    // corretor + grupo do pré-atendimento (para a gestão acompanhar); sem nenhum dos dois, vai para os gestores
-    const para = [telCorretor, grupo].filter(Boolean) as string[];
-    return { texto: t.join("\n"), para: para.length ? para : gestores };
+    return { texto: t.join("\n"), para: destinos(telCorretor) };
   }
 
-  // prazo vencido: corretor + gestores + grupo do pré-atendimento
+  // prazo vencido
   const desde = String(a.ref).split("@")[1];
   const h = desde ? Math.floor((Date.now() - new Date(desde).getTime()) / 3600000) : horas;
   const t = [`⚠️ *Prazo vencido — lead transferido sem contato*`, "", fichaLead(l),
     `Com: ${corretor?.nome ?? "—"} · transferido há ${h}h (prazo ${horas}h)`, "", "Registre o contato no CRM Vendas:", LINK_CRM];
-  return { texto: t.join("\n"), para: [...new Set([telCorretor, ...gestores, grupo].filter(Boolean) as string[])] };
+  return { texto: t.join("\n"), para: destinos(telCorretor) };
 }
 
 async function processarAvisos(opcoes: { teste?: boolean }) {

@@ -51,11 +51,12 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 - Status `origem = 'nutricao'` em `crm_vendas_status`: "Retornar em N dias" (um por coluna). Aparecem para leads do pré, da nutrição, da SDR e para o gestor.
 - `crm_vendas_mover_lead`: lead na nutrição usa os status do pré e da nutrição (não os de venda). Saindo da nutrição, a tentativa de contato volta para o "1º contato".
 
-## Avisos no WhatsApp do corretor
-- Fila `crm_vendas_avisos`, preenchida por gatilhos: **transferência** (`crm_vendas_movimentos` tipo `transferencia` → aviso ao corretor que recebeu, com dados do lead, visita e recado) e **recadastro** (`interacoes` "Novo cadastro" → aviso ao corretor do lead **e ao grupo Pré-atendimento Projetar**). Transferência sem telefone do corretor vai para os gestores.
+## Avisos no WhatsApp (o grupo é o centro de todas as notificações)
+- **Todo aviso vai para o grupo Pré-atendimento Projetar** e também para o corretor envolvido (privado). Corretor sem telefone: só o grupo.
+- Fila `crm_vendas_avisos`, preenchida por gatilhos: **transferência** (`crm_vendas_movimentos` tipo `transferencia`: dados do lead, visita, recado e para quem foi) e **recadastro** (`interacoes` "Novo cadastro").
 - Sem aviso: lead passado para a SDR; troca de corretor direto em `leads` (não gera movimento); e lote feito por SQL com `select set_config('crm_vendas.sem_aviso', '1', true);` antes dos inserts (padrão quando o Claude faz transferência a pedido, salvo se pedirem o aviso).
 - Gestores no privado (`avisos_gestores`, telefones separados por vírgula): vazio desde 26/10 — o Marco acompanha pelo grupo.
-- **Prazo da transferência:** `crm_vendas_config.prazo_transferencia_horas` (2). Em `crm_vendas_alertas()` o tipo `transferencia` fica amarelo até o prazo e vermelho depois (não vale para transferência para a SDR). Vencido → aviso ao corretor, aos gestores (`crm_vendas_relatorio_config.avisos_gestores`) e ao grupo Pré-atendimento Projetar.
+- **Prazo da transferência:** `crm_vendas_config.prazo_transferencia_horas` (2). Em `crm_vendas_alertas()` o tipo `transferencia` fica amarelo até o prazo e vermelho depois (não vale para transferência para a SDR). Vencido → aviso ao corretor e ao grupo.
 - Envio: edge function `crm-vendas-relatorio?acao=avisos` (pg_cron `crm-vendas-avisos`, a cada 2 min), pela instância Seguralta, só dentro de `avisos_horario` (8-21, Brasília); fora disso espera. Aviso com mais de 2 dias na fila é descartado. Ver sem enviar: `&teste=1`.
 - "Novo cadastro" não conta mais como contato (nem no cartão, nem nos avisos de atraso).
 
