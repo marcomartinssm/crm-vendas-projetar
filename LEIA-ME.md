@@ -41,6 +41,14 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 - **Diário:** seg–sex 18h30 (o dia de hoje). **Semanal:** sábado 9h (sábado a sexta). **Mensal:** dia 1 às 8h05 (mês anterior). pg_cron `crm-vendas-relatorio-*` → `crm_vendas_chamar_relatorio(tipo)`.
 - Cada envio fica em `crm_vendas_relatorios` (não manda duas vezes o mesmo período).
 
+## Entrada (aba "Entrada", só SDR e gestor) — igual à Entrada do CRM Aluguel
+- `crm_vendas_entrada`: contatos do WhatsApp que ainda não viraram lead. Duas fontes:
+  1. **Contatos marcados "Vendas" na Entrada do CRM Aluguel** (Milene/central e Thainara/ALUGUELARA) — gatilho `zz_crm_vendas_entrada_do_aluguel` em `crm_aluguel_contatos`. Em 27/10/2026 entraram os 9 dos últimos 30 dias.
+  2. **Número de vendas na Evolution**: edge function `crm-vendas-entrada` (código em `supabase/functions/crm-vendas-entrada/index.ts`, verify_jwt desligado, `?token=` = o mesmo dos relatórios). Só atende instâncias listadas em `crm_vendas_relatorio_config.entrada_instancias` (vazio até escolher o número). Ligar: incluir o nome lá e `POST ...crm-vendas-entrada?token=...&acao=ligar_webhook&instancia=NOME` (ver antes `acao=webhook_atual` — a Evolution aceita **um** webhook por número). `acao=instancias` lista os números e para onde mandam hoje.
+- Regras: grupos e números da casa (donos das instâncias e corretores) são ignorados; mesmo telefone já na Entrada (aberto ou com conversa nos últimos 120 dias) só atualiza a última mensagem; mede a 1ª resposta (minutos corridos).
+- Botões: **Vendas** abre a janela "Mídia de origem" (WhatsApp, Meta Ads, Placa, Site, Instagram…) e cria o lead em "Novo Lead" do pré-atendimento (vai para a SDR), campanha "Entrada WhatsApp". Se o telefone já é lead, não duplica: grava "Novo cadastro" no lead existente (selo "Voltou a se cadastrar" + aviso no grupo). **Outros** só tira da Entrada. Função `crm_vendas_entrada_classificar`.
+- O histórico do lead mostra "Chegou pela Entrada" com a mídia de origem e a primeira mensagem.
+
 ## Fila do dia (aba "Fila do dia")
 - O que fazer hoje, por funil e em ordem de urgência: 🔁 voltaram a se cadastrar (últimos 30 dias, sem contato depois) → 🆕 novos do pré (mais recentes primeiro) → 📞 retornos do pré (1º ao 5º contato; atrasados e depois o contato mais antigo) → 🤝 em atendimento no funil de vendas (atrasados primeiro) → 💤 nutrição com retorno vencido.
 - Quem tem contato registrado hoje sai da fila (menos quem tem aviso de atraso). Tudo calculado na tela (`telaFila` em `index.html`).
@@ -56,6 +64,7 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 - Fila `crm_vendas_avisos`, preenchida por gatilhos: **transferência** (`crm_vendas_movimentos` tipo `transferencia`: dados do lead, visita, recado e para quem foi) e **recadastro** (`interacoes` "Novo cadastro").
 - Sem aviso: lead passado para a SDR; troca de corretor direto em `leads` (não gera movimento); e lote feito por SQL com `select set_config('crm_vendas.sem_aviso', '1', true);` antes dos inserts (padrão quando o Claude faz transferência a pedido, salvo se pedirem o aviso).
 - Gestores no privado (`avisos_gestores`, telefones separados por vírgula): vazio desde 26/10 — o Marco acompanha pelo grupo.
+- **Visita agendada:** todo movimento de agendamento (data obrigatória) gera aviso no grupo e ao corretor do lead, com data, imóvel, quem agendou e o resumo (gatilho `zz_crm_vendas_aviso_visita`).
 - **Prazo da transferência:** `crm_vendas_config.prazo_transferencia_horas` (2). Em `crm_vendas_alertas()` o tipo `transferencia` fica amarelo até o prazo e vermelho depois (não vale para transferência para a SDR). Vencido → aviso ao corretor e ao grupo.
 - Envio: edge function `crm-vendas-relatorio?acao=avisos` (pg_cron `crm-vendas-avisos`, a cada 2 min), pela instância Seguralta, só dentro de `avisos_horario` (8-21, Brasília); fora disso espera. Aviso com mais de 2 dias na fila é descartado. Ver sem enviar: `&teste=1`.
 - "Novo cadastro" não conta mais como contato (nem no cartão, nem nos avisos de atraso).
@@ -80,6 +89,9 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 ## Painel (aba "Painel", só o gestor) e "Ver como"
 - `crm_vendas_painel(ini, fim)`: movimento do período, taxas, atrasos, visão por corretor, funil agora, perdas e imóveis.
 - Seletor "Ver como" no topo: o gestor vê o sistema filtrado como um corretor vê (só visualização; ações ficam no nome do gestor).
+
+- **De onde vêm os leads** (`crm_vendas_painel_origens`): leads que entraram no período, por origem, e até onde cada um já chegou (contatado, respondeu, agendou, visitou, proposta, venda, descartado/perdido), mais a Entrada do WhatsApp no período.
+- **Onde o funil trava**: leads em cada etapa agora, tempo médio na etapa, parados 7+ dias e tempo médio para sair (do histórico, desde 22/10/2026).
 
 ## Posse no 61º dia
 - `crm_vendas_posse_pedidos` + cron horário `crm_vendas_pedidos_posse`: imóvel ativo com 61+ dias sem atualização abre pedido para o gestor (aba Aprovação e aviso no Painel). `crm_vendas_decidir_posse(pedido, 'transferir'|'manter', novo_corretor, obs)`.

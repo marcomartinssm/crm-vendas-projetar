@@ -346,11 +346,12 @@ function render() {
   if (tela.nome !== 'form' && tela.nome !== 'enviado') modoLink = false;
   document.getElementById('abas').hidden = modoLink;
   const abas = gestor() ? [['painel', 'Painel']] : [];
+  if (veEntrada()) abas.push(['entrada', ENT.lista.length ? `Entrada (${ENT.lista.length})` : 'Entrada']);
   abas.push(['fila', 'Fila do dia'], ['pre', 'Pré-atendimento'], ['funil', 'Funil de vendas'], ['nut', 'Nutrição'], ['lista', 'Imóveis'], ['ativ', 'Atividades'], ['pontos', 'Pontuação'], ['comissao', 'Comissão']);
   if (gestor()) { const n = DB.imoveis.filter(i => i.status === 'aguardando').length + POSSE.length; abas.push(['aprovacao', n ? `Aprovação 🔔 ${n}` : 'Aprovação (0)']); }
   const leadAberto = tela.nome === 'lead' ? FUN.leads.find(x => x.id === tela.id) : null;
   const atual = leadAberto ? (tela.de || abaDoLead(leadAberto))
-    : ['painel', 'comissao', 'pontos', 'ativ', 'pre', 'fila', 'nut', 'aprovacao'].includes(tela.nome) ? tela.nome
+    : ['painel', 'comissao', 'pontos', 'ativ', 'pre', 'fila', 'nut', 'entrada', 'aprovacao'].includes(tela.nome) ? tela.nome
     : ['funil', 'lead', 'novolead'].includes(tela.nome) ? 'funil' : 'lista';
   document.getElementById('abas').innerHTML = abas.map(([k, t]) => `<button data-aba="${k}" class="${atual === k ? 'on' : ''}">${t}</button>`).join('');
   const app = document.getElementById('app');
@@ -363,6 +364,7 @@ function render() {
   else if (tela.nome === 'pre') app.innerHTML = telaFunil('pre');
   else if (tela.nome === 'nut') app.innerHTML = telaFunil('nut');
   else if (tela.nome === 'fila') app.innerHTML = telaFila();
+  else if (tela.nome === 'entrada') app.innerHTML = telaEntrada();
   else if (tela.nome === 'painel') { app.innerHTML = telaPainel(); if (!PNL.dados) carregarPainel(); }
   else if (tela.nome === 'comissao') { app.innerHTML = telaComissao(); if (!COM.carregado) carregarComissao(); }
   else if (tela.nome === 'pontos') { app.innerHTML = telaPontos(); if (!PTS.carregado) carregarPontos(); }
@@ -939,7 +941,83 @@ async function carregarFunil() {
     (it.data || []).forEach(x => x.tipo === 'Novo cadastro' ? recad(x.lead_id, dataUTC(x.created_at)) : marca(x.lead_id, dataUTC(x.created_at), x.tipo));
     (mv.data || []).forEach(x => { if (x.extras && x.extras.contato) marca(x.lead_id, x.quando, x.extras.contato); });
   }
+  await carregarEntrada();
 }
+// ---------- Entrada: contatos do WhatsApp que ainda não viraram lead (SDR e gestor) ----------
+const ENT = { lista: [], recentes: [] };
+const veEntrada = () => !VER && (souAprovador || (FUN.sdrs || []).includes(MEU_CORRETOR));
+const ATENDENTE_ALUGUEL = { central: 'Milene', ALUGUELARA: 'Thainara' };
+const ORIGENS_ENTRADA = ['WhatsApp', 'Meta Ads', 'Placa', 'Site', 'Instagram Imobiliária', 'Instagram Corretor', 'Indicação', 'Grupo Zap', 'Construtora Carlessi', 'Anúncio Corretor', 'Plantão Imobiliária', 'Outro'];
+async function carregarEntrada() {
+  if (!veEntrada()) { ENT.lista = []; ENT.recentes = []; return; }
+  const semana = new Date(Date.now() - 7 * 864e5).toISOString();
+  const [a, r] = await Promise.all([
+    db.from('crm_vendas_entrada').select('*').is('classificacao', null).order('ultima_mensagem_em', { ascending: false, nullsFirst: false }).limit(300),
+    db.from('crm_vendas_entrada').select('*').not('classificacao', 'is', null).gte('classificado_em', semana).order('classificado_em', { ascending: false }).limit(40),
+  ]);
+  ENT.lista = a.data || []; ENT.recentes = r.data || [];
+}
+const quandoTxt = (ts) => { if (!ts) return ''; const h = Math.floor((Date.now() - new Date(ts)) / 36e5); return h < 1 ? 'agora há pouco' : h < 24 ? `há ${h}h` : `há ${Math.floor(h / 24)}d`; };
+function leadExistenteTxt(e) {
+  if (!e.lead_existente) return null;
+  const l = FUN.leads.find(x => x.id === e.lead_existente);
+  return l ? `Já é lead · ${CORRETORES[l.corretor_id] || 'sem corretor'} · ${faseNome(l.fase_id)}` : 'Já é lead no CRM';
+}
+function cardEntrada(e) {
+  const tel = String(e.telefone || '').replace(/\D/g, ''), ja = leadExistenteTxt(e);
+  const fonte = e.fonte === 'aluguel' ? `Veio do aluguel · ${ATENDENTE_ALUGUEL[e.instancia] || e.instancia}` : `WhatsApp vendas${e.instancia ? ' · ' + e.instancia : ''}`;
+  const resp = e.primeira_resposta_min != null ? `Respondido em ${e.primeira_resposta_min < 60 ? e.primeira_resposta_min + ' min' : Math.round(e.primeira_resposta_min / 60) + 'h'}` : (e.fonte === 'whatsapp' ? 'Ainda sem resposta' : '');
+  return `<div class="kcard" style="cursor:default">
+    <div class="ktopo"><span class="kav">${esc(iniciais(e.nome))}</span><b>${esc(e.nome || 'Sem nome')}</b></div>
+    <div class="ktel">☏ ${esc(e.telefone)} <button class="kcopia" data-copiar="${esc(e.telefone)}" title="Copiar telefone" aria-label="Copiar telefone">⧉</button>${tel ? ` · <a href="https://wa.me/${tel.length <= 11 ? '55' + tel : tel}" target="_blank" style="color:var(--azul)">WhatsApp</a>` : ''}</div>
+    <div class="selos"><span class="selo vinho">${esc(fonte)}</span>${ja ? `<span class="selo azul">${esc(ja)}</span>` : ''}</div>
+    ${e.primeira_mensagem ? `<div class="s" style="margin-top:6px">“${esc(String(e.primeira_mensagem).slice(0, 160))}”</div>` : ''}
+    ${e.ultima_mensagem && e.ultima_mensagem !== e.primeira_mensagem ? `<div class="s" style="color:var(--suave);margin-top:4px">Última: “${esc(String(e.ultima_mensagem).slice(0, 120))}” · ${quandoTxt(e.ultima_mensagem_em)}</div>` : `<div class="s" style="color:var(--suave);margin-top:4px">${quandoTxt(e.ultima_mensagem_em || e.criado_em)}</div>`}
+    ${resp ? `<div class="kult ${e.primeira_resposta_min == null ? 'alerta' : ''}">${resp}</div>` : ''}
+    <div style="display:flex;gap:6px;margin-top:6px"><button class="principal" style="flex:1" data-entvendas="${e.id}">Vendas</button><button style="flex:1" data-entoutros="${e.id}">Outros</button></div>
+  </div>`;
+}
+function telaEntrada() {
+  if (!veEntrada()) return '<div class="vazio">A Entrada é da SDR e do gestor.</div>';
+  const rec = ENT.recentes.map(e => `<div class="linha"><span>${esc(e.nome || e.telefone)} <span class="dica">${e.fonte === 'aluguel' ? 'aluguel' : 'WhatsApp'}</span></span><span>${e.classificacao === 'vendas' ? `<span class="selo verde">Vendas · ${esc(e.origem || '')}</span>` : '<span class="selo">Outros</span>'} <span class="dica">${quandoTxt(e.classificado_em)}</span></span></div>`).join('');
+  return `<div class="barra"><span class="s" style="color:var(--suave)">Quem chamou no WhatsApp de vendas ou foi marcado "Vendas" na Entrada do aluguel. <b>Vendas</b> cria o lead no pré-atendimento (se o telefone já é lead, não duplica: o lead ganha o selo "Voltou a se cadastrar"). <b>Outros</b> só tira daqui.</span></div>
+    <div class="fsec"><div class="khead"><span>Aguardando classificação</span><span style="color:var(--suave)">${ENT.lista.length}</span></div>
+      ${ENT.lista.length ? `<div class="fgrid">${ENT.lista.map(cardEntrada).join('')}</div>` : '<div class="s" style="color:var(--suave)">Nenhum contato esperando.</div>'}</div>
+    ${rec ? `<div class="fsec"><div class="khead"><span>Classificados nos últimos 7 dias</span><span style="color:var(--suave)">${ENT.recentes.length}</span></div>${rec}</div>` : ''}`;
+}
+function abrirModalEntrada(id) {
+  const e = ENT.lista.find(x => String(x.id) === String(id)); if (!e) return;
+  const ja = leadExistenteTxt(e);
+  const m = document.getElementById('modal');
+  m.innerHTML = `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h2 style="font-size:16px;margin:0">Vendas · gerar lead</h2><button data-fecharmodal aria-label="Fechar">✕</button></div>
+    <div style="color:var(--suave);font-size:13px;margin-bottom:12px">${esc(e.nome || 'Sem nome')} · ${esc(e.telefone)}</div>
+    ${ja ? `<div class="aviso" style="background:var(--azul-claro);color:var(--azul)">${esc(ja)}. Não vamos duplicar: esse lead ganha o selo "Voltou a se cadastrar" e o grupo é avisado.</div>` : ''}
+    <div class="q"><label for="e_origem">Mídia de origem *</label><select id="e_origem"><option value="">Por onde o cliente chegou?</option>${ORIGENS_ENTRADA.map(o => `<option>${o}</option>`).join('')}</select></div>
+    ${ja ? '' : `<div class="grade"><div class="q"><label for="e_nome">Nome</label><input id="e_nome" value="${esc(e.nome || '')}"></div><div class="q"><label for="e_cod">Código do imóvel (se tiver)</label><input id="e_cod" placeholder="1001"></div></div>`}
+    <div class="erro" id="e_erro"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button data-fecharmodal>Cancelar</button><button class="principal" data-confirmarent="${e.id}">${ja ? 'Confirmar' : 'Gerar lead'}</button></div></div>`;
+  m.hidden = false;
+  document.getElementById('e_origem').focus();
+}
+document.addEventListener('click', async (ev) => {
+  const b = ev.target.closest('[data-entvendas], [data-entoutros], [data-confirmarent]'); if (!b) return;
+  const ds = b.dataset;
+  if (ds.entvendas) return abrirModalEntrada(ds.entvendas);
+  let classe = 'outros', extra = {};
+  if (ds.confirmarent) {
+    const origem = document.getElementById('e_origem').value;
+    if (!origem) { document.getElementById('e_erro').textContent = 'Escolha a mídia de origem.'; return; }
+    classe = 'vendas';
+    extra = { p_origem: origem, p_nome: document.getElementById('e_nome')?.value.trim() || null, p_codigo_imovel: document.getElementById('e_cod')?.value.trim() || null };
+  } else if (!confirm('Marcar como "Outros"? O contato sai da Entrada e não vira lead.')) return;
+  b.disabled = true;
+  const { error } = await db.rpc('crm_vendas_entrada_classificar', { p_id: +(ds.confirmarent || ds.entoutros), p_classe: classe, ...extra });
+  b.disabled = false;
+  if (error) { const er = document.getElementById('e_erro'); if (er) er.textContent = error.message; else aviso(error.message, true); return; }
+  fecharModal();
+  aviso(classe === 'vendas' ? 'Lead gerado no pré-atendimento.' : 'Contato marcado como Outros.');
+  await carregarFunil(); render();
+});
 function alertaTxt(a) {
   if (!a) return null;
   const h = Math.floor(a.horas), d = Math.floor(a.horas / 24);
@@ -1175,21 +1253,25 @@ function extrasMover(tipo) {
   return '';
 }
 async function historicoLead(id) {
-  const [{ data: movs }, { data: ints }] = await Promise.all([
+  const [{ data: movs }, { data: ints }, { data: ents }] = await Promise.all([
     db.from('crm_vendas_movimentos').select('*').eq('lead_id', id),
     db.from('interacoes').select('tipo, descricao, corretor_id, created_at').eq('lead_id', id),
+    db.from('crm_vendas_entrada').select('fonte, instancia, origem, primeira_mensagem, classificado_em').eq('lead_id', id), // só SDR e gestor enxergam
   ]);
   const el = document.getElementById('hist-lead'); if (!el) return;
   // Interações do CRM Leads entram no histórico. Mover o lead aqui também grava uma interação no mesmo instante: essa fica de fora para não repetir.
   const tempos = (movs || []).map(m => new Date(m.quando).getTime());
   const data = [...(movs || []), ...(ints || []).map(i => ({ interacao: true, ...i, quando: dataUTC(i.created_at) }))
-    .filter(i => !tempos.some(t => Math.abs(t - new Date(i.quando).getTime()) < 2000))]
+    .filter(i => !tempos.some(t => Math.abs(t - new Date(i.quando).getTime()) < 2000)),
+    ...(ents || []).map(e => ({ entrada: true, ...e, quando: e.classificado_em }))]
     .sort((a, b) => new Date(b.quando) - new Date(a.quando));
   const extrasTxt = (x) => { const p = [];
     if (x.data_visita) p.push('visita ' + new Date(x.data_visita).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }));
     if (x.valor) p.push(brl(x.valor)); if (x.honorario) p.push('honorário ' + x.honorario + '%');
     if (x.codigo_imovel) p.push('Cód. ' + x.codigo_imovel); return p.length ? ' · ' + p.join(' · ') : ''; };
-  el.innerHTML = '<h3>Histórico</h3>' + (data.map(m => m.interacao ? `<div class="hist"><b>${esc(m.tipo || 'Interação')} <span class="selo">CRM Leads</span></b>
+  el.innerHTML = '<h3>Histórico</h3>' + (data.map(m => m.entrada ? `<div class="hist"><b>Chegou pela Entrada <span class="selo">${m.fonte === 'aluguel' ? 'via aluguel · ' + esc(ATENDENTE_ALUGUEL[m.instancia] || m.instancia || '') : 'WhatsApp vendas'}</span></b>
+    <div style="color:var(--suave)">Mídia de origem: ${esc(m.origem || '—')}${m.primeira_mensagem ? ` · “${esc(String(m.primeira_mensagem).slice(0, 160))}”` : ''}</div>
+    <div style="color:var(--suave);font-size:12px">${new Date(m.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</div></div>` : m.interacao ? `<div class="hist"><b>${esc(m.tipo || 'Interação')} <span class="selo">CRM Leads</span></b>
     <div style="color:var(--suave)">${esc(m.descricao || '')}${m.corretor_id && CORRETORES[m.corretor_id] ? ' · ' + esc(CORRETORES[m.corretor_id]) : ''}</div>
     <div style="color:var(--suave);font-size:12px">${new Date(m.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</div></div>` : `<div class="hist"><b>${m.status_tipo === 'transferencia' ? 'Transferência de atendimento' : m.de_fase && m.de_fase === m.para_fase ? 'Continua em ' + esc(faseNome(m.para_fase)) : (m.de_fase ? esc(faseNome(m.de_fase)) + ' → ' : '') + esc(faseNome(m.para_fase))}</b>
     <div style="color:var(--suave)">Status: "${esc(m.status_nome || '')}"${m.extras && m.extras.contato ? ' · ' + esc(m.extras.contato) : ''}${m.observacao ? ' · ' + esc(m.observacao) : ''}${esc(extrasTxt(m.extras || {}))}</div>
@@ -1592,9 +1674,12 @@ function periodoPainel() {
 }
 async function carregarPainel() {
   const [ini, fim] = periodoPainel();
-  const { data, error } = await db.rpc('crm_vendas_painel', { p_ini: ini, p_fim: fim });
+  const [{ data, error }, org] = await Promise.all([
+    db.rpc('crm_vendas_painel', { p_ini: ini, p_fim: fim }),
+    db.rpc('crm_vendas_painel_origens', { p_ini: ini, p_fim: fim }),
+  ]);
   if (error) { aviso('Não foi possível carregar o painel.', true); return; }
-  PNL.dados = data; if (tela.nome === 'painel') render();
+  PNL.dados = data; PNL.origens = org.data || null; if (tela.nome === 'painel') render();
 }
 const pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '—';
 function telaPainel() {
@@ -1624,6 +1709,7 @@ function telaPainel() {
       ${d.corretores.map(c => `<tr style="border-top:1px solid var(--borda)"><td style="padding:7px 4px;font-weight:600">${esc(c.nome)}</td><td>${c.leads_abertos}</td><td style="color:${c.atrasados ? 'var(--vermelho)' : 'inherit'}">${c.atrasados}</td><td>${c.contatos}</td><td>${c.visitas}</td><td>${c.propostas}</td><td>${c.vendas}</td><td>${brl(c.vgv)}</td><td style="color:${c.faltas ? 'var(--vermelho)' : 'inherit'}">${c.faltas}</td><td>${c.atividades}</td><td>${c.agenciamentos}</td>
         <td>${c.imoveis_ativos ? `${c.imoveis_ativos} · nota ${fmtPts(c.media_carteira)} · ${c.carteira_em_dia}% em dia` : '—'}</td><td>${fmtPts(c.pontos)}${c.pontos_ativos ? '' : ' <span class="dica">(guardados)</span>'}</td></tr>`).join('')}
     </tbody></table></div>
+  ${painelOrigens(PNL.origens)}
   <div class="det">
     <div class="card"><h2 style="font-size:16px;margin:0 0 8px">Como está o funil agora</h2>
       <h3 style="font-size:13px;color:var(--suave);margin:4px 0">Pré-atendimento</h3>${funil('pre')}
@@ -1639,6 +1725,33 @@ function telaPainel() {
         <div class="linha"><span>Agenciamentos aprovados no período</span><span>${m.agenciamentos}</span></div></div>
     </div>
   </div>`;
+}
+// De onde vêm os leads (até onde cada origem chega no funil) e onde o funil trava (tempo em cada etapa).
+function painelOrigens(o) {
+  if (!o) return '';
+  const th = (h) => `<th style="padding:6px 4px;font-weight:600">${h}</th>`;
+  const cel = (n, base) => `<td style="padding:6px 4px">${n}${base && n ? ` <span class="dica">${pct(n, base)}</span>` : ''}</td>`;
+  const linha = (r, nome, forte) => `<tr style="border-top:1px solid var(--borda)${forte ? ';font-weight:600' : ''}"><td style="padding:7px 4px">${esc(nome)}</td>${cel(r.entraram)}${cel(r.contatados, r.entraram)}${cel(r.responderam, r.entraram)}${cel(r.agendaram, r.entraram)}${cel(r.visitaram, r.entraram)}${cel(r.proposta, r.entraram)}${cel(r.venda, r.entraram)}${cel(r.encerrados, r.entraram)}</tr>`;
+  const en = o.entrada || {};
+  const etapas = (o.etapas || []).filter(e => e.leads || e.saidas);
+  const fmtD = (d) => d == null ? '—' : `${String(d).replace('.', ',')} d`;
+  return `<div class="card" style="margin-bottom:12px;overflow-x:auto"><h2 style="font-size:16px;margin:0 0 4px">De onde vêm os leads</h2>
+    <div class="dica" style="margin-bottom:8px">Leads que entraram no período e até onde cada um já chegou no funil (% sobre os que entraram).</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:720px"><thead><tr style="color:var(--suave);text-align:left">
+      ${['Origem', 'Entraram', 'Contatados', 'Responderam', 'Agendaram', 'Visitaram', 'Proposta', 'Venda', 'Descartados/perdidos'].map(th).join('')}</tr></thead><tbody>
+      ${(o.origens || []).map(r => linha(r, r.origem)).join('') || '<tr><td colspan="9" class="dica" style="padding:7px 4px">Nenhum lead novo no período.</td></tr>'}
+      ${(o.origens || []).length > 1 ? linha(o.total, 'Total', true) : ''}
+    </tbody></table>
+    ${en.chegaram ? `<div class="dica" style="margin-top:8px">Entrada do WhatsApp no período: ${en.chegaram} contato${en.chegaram > 1 ? 's' : ''} · ${en.vendas} viraram lead · ${en.outros} outros · ${en.aguardando} aguardando${en.resposta_media_min != null ? ` · 1ª resposta média ${en.resposta_media_min < 60 ? en.resposta_media_min + ' min' : Math.round(en.resposta_media_min / 60) + 'h'}` : ''}</div>` : ''}
+  </div>
+  <div class="card" style="margin-bottom:12px;overflow-x:auto"><h2 style="font-size:16px;margin:0 0 4px">Onde o funil trava</h2>
+    <div class="dica" style="margin-bottom:8px">Quantos leads estão em cada etapa agora e há quanto tempo. "Tempo para sair" usa o histórico (desde 22/10/2026).</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:620px"><thead><tr style="color:var(--suave);text-align:left">
+      ${['Funil', 'Etapa', 'Leads agora', 'Tempo médio na etapa', 'Parados 7+ dias', 'Tempo para sair'].map(th).join('')}</tr></thead><tbody>
+      ${etapas.map(e => { const ruim = e.leads && e.parados_7d / e.leads > 0.5;
+        return `<tr style="border-top:1px solid var(--borda)"><td style="padding:7px 4px;color:var(--suave)">${esc(e.funil)}</td><td style="padding:7px 4px">${esc(e.fase)}</td><td>${e.leads}</td><td>${fmtD(e.dias_medio)}</td>
+          <td style="color:${ruim ? 'var(--vermelho)' : 'inherit'}">${e.parados_7d}${e.leads ? ` <span class="dica">${pct(e.parados_7d, e.leads)}</span>` : ''}</td><td>${fmtD(e.dias_para_sair)}${e.saidas ? ` <span class="dica">(${e.saidas})</span>` : ''}</td></tr>`; }).join('')}
+    </tbody></table></div>`;
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-periodo]'); if (b) { PNL.periodo = b.dataset.periodo; PNL.dados = null; render(); carregarPainel(); } });
 

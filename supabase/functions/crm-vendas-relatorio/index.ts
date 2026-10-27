@@ -236,8 +236,8 @@ async function listarGrupos(instanciaParam: string | null) {
 }
 
 // ---------- avisos no WhatsApp do corretor ----------
-// A fila crm_vendas_avisos é preenchida por gatilhos no banco: transferência (crm_vendas_movimentos) e recadastro
-// (interacoes "Novo cadastro"). O prazo vencido da transferência entra aqui, a partir de crm_vendas_alertas().
+// A fila crm_vendas_avisos é preenchida por gatilhos no banco: transferência e visita agendada (crm_vendas_movimentos)
+// e recadastro (interacoes "Novo cadastro"). O prazo vencido da transferência entra aqui, a partir de crm_vendas_alertas().
 // Só envia dentro de avisos_horario (Brasília, ex. "8-21"); fora disso o aviso espera. Aviso com mais de 2 dias é descartado.
 
 const LINK_CRM = "https://marcomartinssm.github.io/crm-vendas-projetar/";
@@ -303,6 +303,20 @@ async function montarAviso(a: any, cfg: Record<string, string>, nomes: Record<st
     const t = [`🔁 *Lead voltou a se cadastrar*`, "", fichaLead(l)];
     if (i?.descricao) t.push(`_${i.descricao}_`);
     t.push(`Com: ${corretor?.nome ?? "—"}`, "", "Chame o cliente e registre o contato no CRM Vendas:", LINK_CRM);
+    return { texto: t.join("\n"), para: destinos(telCorretor) };
+  }
+
+  if (a.tipo === "visita") {
+    const { data: m } = await db.from("crm_vendas_movimentos").select("observacao, extras, por").eq("id", Number(a.ref)).maybeSingle();
+    const { data: uc } = m?.por ? await db.from("usuarios_corretores").select("corretor_id").eq("user_id", m.por).maybeSingle() : { data: null };
+    const quem = uc?.corretor_id ? nomes[uc.corretor_id]?.nome : null;
+    const t = [`📅 *Visita agendada*`, "", fichaLead(l)];
+    t.push(`🗓️ *${dataHora(m?.extras?.data_visita) ?? "data não informada"}*`);
+    if (m?.extras?.codigo_imovel) t.push(`Imóvel da visita: Cód. ${m.extras.codigo_imovel}`);
+    t.push(`Corretor: ${corretor?.nome ?? "—"}`);
+    if (quem && quem !== corretor?.nome) t.push(`Agendado por: ${quem}`);
+    if (m?.observacao) t.push(`📝 ${m.observacao}`);
+    t.push("", "Depois da visita, registre o resultado no CRM Vendas:", LINK_CRM);
     return { texto: t.join("\n"), para: destinos(telCorretor) };
   }
 
