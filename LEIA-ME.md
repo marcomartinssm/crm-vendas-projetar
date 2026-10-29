@@ -97,8 +97,10 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 ## Posse no 61º dia
 - `crm_vendas_posse_pedidos` + cron horário `crm_vendas_pedidos_posse`: imóvel ativo com 61+ dias sem atualização abre pedido para o gestor (aba Aprovação e aviso no Painel). `crm_vendas_decidir_posse(pedido, 'transferir'|'manter', novo_corretor, obs)`.
 
-## Descrição com IA
-- Edge function `crm-vendas-descricao` (código em `supabase/functions/crm-vendas-descricao/index.ts`), modelo claude-opus-5-5, saída estruturada. Precisa do secret `ANTHROPIC_API_KEY` no Supabase (Edge Functions → Secrets). Sem a chave, o botão avisa que a IA ainda não está ligada.
+## Descrição com IA (pelo plano Max do Marco, não pela API)
+- Botão "Pedir descrição com IA" no cadastro (etapa "Sobre o imóvel") e na ficha: só marca `dados.pedir_descricao`. Imóvel enviado/ativo sem descrição também entra na fila sozinho.
+- Tarefa agendada do Claude (app no Mac) **crm-vendas-descricoes-imoveis**: de hora em hora, 8h–19h, seg–sáb. Lê `crm_vendas_descricoes_pendentes()` e grava com `crm_vendas_salvar_descricao(id, json)` (em `dados.descricao_seo`). Só roda com o app do Claude aberto no Mac.
+- A edge function `crm-vendas-descricao` (API, precisa de `ANTHROPIC_API_KEY`) ficou como alternativa, sem uso pela tela.
 
 ## Endereço publicado
 - https://marcomartinssm.github.io/crm-vendas-projetar/ (link direto de cadastro de imóvel: `.../#novo`)
@@ -112,6 +114,5 @@ python3 -m http.server 8897 --directory "/Users/marcomartins/Documents/IA e auto
 Depois abrir http://localhost:8897 (entrar com o login do CRM Leads).
 
 ## Ainda não feito
-- Cadastrar a chave da API da Anthropic (secret ANTHROPIC_API_KEY).
 - Endereço final: decidir junto com o CRM Leads.
 - Time Platina em stand-by.

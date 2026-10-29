@@ -450,6 +450,14 @@ document.addEventListener('click', async e => {
   await carregar(); render();
 });
 
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-pedirdesc]'); if (!b) return;
+  b.disabled = true;
+  const { error } = await db.rpc('crm_vendas_pedir_descricao', { p_imovel: b.dataset.pedirdesc });
+  if (error) { b.disabled = false; aviso(error.message, true); return; }
+  aviso('Descrição pedida. Fica pronta em até 1 hora.'); await carregar(); render();
+});
+
 // ---------- formulário ----------
 const PASSOS = ['Tipo e endereço', 'Valores', 'Áreas e cômodos', 'Características', 'Sobre o imóvel', 'Documentos', 'Fotos e divulgação'];
 const OPC = {
@@ -545,8 +553,8 @@ function corpoPasso() {
     ${chips('perto', 'O que tem perto', OPC.perto)}
     ${chips('perfil', 'Ideal para', OPC.perfil)}
     <div class="q"><label>O que mais chama atenção na visita? (1 a 2 frases)</label><textarea data-k="frase" rows="2" placeholder="Casa muito iluminada, com pátio nos fundos ótimo para churrasco">${esc(F.frase)}</textarea></div>
-    <div class="card" style="background:var(--fundo)"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-weight:600">Descrição do anúncio</b><button type="button" data-gerardesc>${F.descricao_seo ? '↻ Gerar outra versão' : '✨ Gerar descrição com IA'}</button></div>
-      <div id="desc-box">${blocoDescricao(F.descricao_seo)}</div></div>`;
+    <div class="card" style="background:var(--fundo)"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-weight:600">Descrição do anúncio</b><button type="button" data-gerardesc>${F.pedir_descricao ? '✓ Descrição pedida' : F.descricao_seo ? '↻ Pedir outra versão' : '✨ Pedir descrição com IA'}</button></div>
+      <div id="desc-box">${F.pedir_descricao ? '<div class="dica" style="margin-top:6px">Pedido feito. Depois que você <b>salvar ou enviar o cadastro</b>, a IA escreve o título e o texto do anúncio em até 1 hora (de hora em hora, em horário comercial).</div>' : ''}${blocoDescricao(F.descricao_seo, !!F.pedir_descricao)}</div></div>`;
   if (passo === 5) {
     const constr = t === 'casa' ? 'A casa' : t === 'apto' ? 'O apartamento' : 'A sala';
     const avisoAver = F.aver === 'sim' ? '<div class="aviso" style="background:var(--verde-claro);color:var(--verde)">Averbado: o imóvel pode ser vendido com financiamento.</div>'
@@ -583,8 +591,8 @@ function corpoPasso() {
     ${t !== 'terreno' ? `<label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" data-b="chave" ${F.chave ? 'checked' : ''} style="width:auto"> A chave ficou na imobiliária</label>` : ''}`;
 }
 
-function blocoDescricao(dsc) {
-  if (!dsc) return '<div class="dica" style="margin-top:6px">Responda as perguntas acima e clique para a IA escrever o título e o texto do anúncio.</div>';
+function blocoDescricao(dsc, pedida) {
+  if (!dsc) return pedida ? '' : '<div class="dica" style="margin-top:6px">Responda as perguntas acima e peça a descrição: a IA escreve o título e o texto do anúncio com SEO. Se não pedir, ela é escrita sozinha quando o imóvel for enviado para aprovação.</div>';
   return `<div style="margin-top:8px;font-size:14px">
     <div class="dica">Título do Google (${(dsc.titulo_google || '').length}/60)</div><div style="font-weight:600">${esc(dsc.titulo_google)}</div>
     <div class="dica" style="margin-top:6px">Meta description (${(dsc.meta_description || '').length}/155)</div><div>${esc(dsc.meta_description)}</div>
@@ -592,19 +600,11 @@ function blocoDescricao(dsc) {
     <h3 style="font-size:16px;margin:10px 0 4px">${esc(dsc.h1)}</h3>
     ${(dsc.secoes || []).map(x => `<div style="font-weight:600;margin-top:6px">${esc(x.h2)}</div><div style="line-height:1.6">${esc(x.texto)}</div>`).join('')}</div>`;
 }
-document.addEventListener('click', async e => {
+document.addEventListener('click', e => {
   const b = e.target.closest('[data-gerardesc]'); if (!b || !F) return;
-  const box = document.getElementById('desc-box');
-  const dados = {}; for (const k of ['tipo', 'bairro', 'cidade', 'uf', 'ref', 'predio', 'venda', 'fin', 'perm', 'area', 'area_global', 'area_terreno', 'medidas', 'quartos', 'suites', 'banh', 'salas', 'vagas', 'vaga_tipo', 'andar', 'andares', 'elevadores', 'posicao', 'topografia', 'zoneamento', 'usos', 'lazer', 'intr', 'ext', 'infra', 'estado', 'dest', 'perto', 'perfil', 'frase', 'aver']) if (!vazio(F[k]) && !(Array.isArray(F[k]) && !F[k].length)) dados[k] = F[k];
-  dados.tipo = TIPOS[F.tipo] || F.tipo;
-  b.disabled = true; box.innerHTML = '<div class="dica" style="margin-top:6px">Escrevendo a descrição… (leva alguns segundos)</div>';
-  const { data, error } = await db.functions.invoke('crm-vendas-descricao', { body: { dados } });
-  b.disabled = false;
-  let msg = data?.erro;
-  if (error) { try { msg = (await error.context.json()).erro; } catch (_) { msg = 'Não foi possível gerar agora.'; } }
-  if (msg || !data?.descricao) { box.innerHTML = `<div class="erro" style="margin-top:6px">${esc(msg || 'Não foi possível gerar agora.')}</div>${F.descricao_seo ? blocoDescricao(F.descricao_seo) : ''}`; return; }
-  F.descricao_seo = data.descricao; box.innerHTML = blocoDescricao(F.descricao_seo); b.textContent = '↻ Gerar outra versão';
-  aviso('Descrição gerada. Ela é salva junto com o cadastro.');
+  F.pedir_descricao = true;
+  document.getElementById('corpo').innerHTML = corpoPasso();
+  aviso('Descrição pedida. Ela fica pronta em até 1 hora depois que o cadastro for salvo.');
 });
 function placar(d) {
   const { total, obr, obrMax, completo, linhas } = pontuar(d);
@@ -688,7 +688,10 @@ function telaDetalhe() {
         </div>
         <div class="bloco"><h3>Para a descrição do anúncio</h3>
           ${L('Estado', im.estado)}${L('Destaques', im.dest)}${L('Perto de', im.perto)}${L('Ideal para', im.perfil)}${L('Na visita', im.frase)}
-          ${im.descricao_seo ? `<div class="card" style="background:var(--fundo);margin-top:8px"><b style="font-weight:600">Descrição do anúncio (IA)</b>${blocoDescricao(im.descricao_seo)}</div>` : '<div class="dica" style="font-size:12px;color:var(--suave);margin-top:6px">Descrição com IA ainda não gerada (botão na etapa "Sobre o imóvel" do cadastro).</div>'}
+          <div class="card" style="background:var(--fundo);margin-top:8px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-weight:600">Descrição do anúncio (IA)</b>
+            ${(gestor() || im.corretor === usuario) && im.status !== 'rascunho' ? `<button data-pedirdesc="${im.id}" ${im.pedir_descricao ? 'disabled' : ''}>${im.pedir_descricao ? '✓ Pedida' : im.descricao_seo ? '↻ Pedir outra versão' : '✨ Pedir descrição'}</button>` : ''}</div>
+            ${im.pedir_descricao || (!im.descricao_seo && ['aguardando', 'ativo'].includes(im.status)) ? '<div class="dica" style="margin-top:6px">Na fila: a IA escreve em até 1 hora (de hora em hora, em horário comercial).</div>' : ''}
+            ${im.descricao_seo ? blocoDescricao(im.descricao_seo) : (im.status === 'rascunho' && !im.pedir_descricao ? '<div class="dica" style="margin-top:6px">Ainda não pedida. Ela é escrita sozinha quando o imóvel for enviado para aprovação.</div>' : '')}</div>
         </div>
         <div class="bloco"><h3>Documentos</h3>
           ${L('Número da matrícula', im.mat_num)}${L('Cartório', im.mat_cartorio)}${doc('PDF da matrícula' + (im.mat_data ? ` (emitida há ${dias(im.mat_data)} dias)` : ''), im.mat_arq, 'mat_arq')}${doc('CNH / RG e CPF', im.cnh_arq, 'cnh_arq')}${doc('Comprovante de endereço', im.comp_arq, 'comp_arq')}
