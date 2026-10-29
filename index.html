@@ -199,6 +199,16 @@
     <button class="principal" style="width:100%;padding:10px">Entrar</button>
   </form>
 </section>
+<section id="link-entrada" hidden>
+  <form class="card" id="form-link">
+    <h2 style="margin:0 0 4px">Cadastro de agenciamento</h2>
+    <p style="color:var(--suave);margin:0 0 14px;font-size:14px">Escolha seu nome e digite os 4 últimos números do seu celular.</p>
+    <div class="q"><label for="link-corretor">Corretor</label><select id="link-corretor" required><option value="">Escolha seu nome</option></select></div>
+    <div class="q"><label for="link-digitos">4 últimos números do seu celular</label><input id="link-digitos" inputmode="numeric" maxlength="4" autocomplete="off" required style="font-size:22px;letter-spacing:8px;max-width:140px"></div>
+    <div class="erro" id="erro-link"></div>
+    <button class="principal" style="width:100%;padding:10px">Entrar e abrir a ficha</button>
+  </form>
+</section>
 <div id="faixa-vercomo">Você está vendo o sistema como o corretor vê. O que registrar aqui (atividades, imóveis, leads) entra no nome desse corretor e fica marcado como lançado por você. Para voltar, escolha "Ver como: Gestor".</div>
 <main id="app" hidden></main>
 <div id="aviso" hidden></div>
@@ -283,6 +293,7 @@ function situacaoAtualizacao(im) {
 }
 const STATUS = {
   rascunho: { t: 'Rascunho', c: '' },
+  revisao: { t: 'Em revisão', c: 'ambar' },
   aguardando: { t: 'Aguardando aprovação', c: 'azul' },
   devolvido: { t: 'Devolvido para ajuste', c: 'vinho' },
   ativo: { t: 'Aprovado · ativo', c: 'verde' },
@@ -388,7 +399,7 @@ function cartao(im) {
     <div>
       <div class="t">${esc(TIPOS[im.tipo] || 'Tipo não definido')} · ${esc(im.bairro || 'sem bairro')}</div>
       <div class="s">${esc(im.end || 'Endereço não preenchido')} · ${brl(im.venda)}${gestor() ? ' · ' + esc(CORRETORES[im.corretor] || '') : ''}</div>
-      <div class="selos"><span class="selo ${st.c}">${st.t}</span>${at ? `<span class="selo ${at.c}">${at.t}</span>` : ''}<span class="selo">${codigoTxt(im)}</span>${im.codigo_imoview ? `<span class="selo">Imoview ${esc(im.codigo_imoview)}</span>` : ''}</div>
+      <div class="selos"><span class="selo ${st.c}">${st.t}</span>${im.status === 'revisao' ? `<span class="selo">${im.link_enviado ? 'veio do celular' : 'celular · pela metade'}</span>` : ''}${at ? `<span class="selo ${at.c}">${at.t}</span>` : ''}<span class="selo">${codigoTxt(im)}</span>${im.codigo_imoview ? `<span class="selo">Imoview ${esc(im.codigo_imoview)}</span>` : ''}</div>
     </div>
     <div class="s" style="text-align:right">${fx.t}</div>
   </div>`;
@@ -405,7 +416,9 @@ function telaLista() {
   const q = filtro.busca.toLowerCase();
   const filtrados = lista.filter(i => (!filtro.status || i.status === filtro.status) &&
     (!q || [i.end, i.bairro, i.codigo, i.codigo_imoview, TIPOS[i.tipo], CORRETORES[i.corretor]].join(' ').toLowerCase().includes(q)));
+  const emRevisao = lista.filter(i => i.status === 'revisao' && (!gestor() || VER));
   return `
+    ${emRevisao.length ? `<button class="aviso" style="display:block;width:100%;text-align:left;border:none;background:var(--ambar-claro);color:var(--ambar)" data-frev>${emRevisao.length} agenciamento(s) do link <b>em revisão</b>: confira e envie ao gestor. Clique para ver.</button>` : ''}
     <div class="kpis">
       <div class="kpi"><small>Imóveis ativos</small><b>${ativos.length}</b></div>
       <div class="kpi"><small>Nota média da carteira</small><b>${media}</b> <span class="selo ${media >= 75 ? 'verde' : 'ambar'}">meta 75</span></div>
@@ -622,7 +635,7 @@ function placar(d) {
 function telaForm() {
   const devolvido = F.status === 'devolvido' && F.obs_devolucao;
   return `
-    <div style="margin-bottom:10px"><button data-voltar>← Voltar para imóveis</button></div>
+    ${LINK ? `<div class="dica" style="margin-bottom:10px">Olá, ${esc(LINK.nome.split(' ')[0])}. O que você preencher vai para o CRM em <b>Em revisão</b>; depois você confere na imobiliária.</div>` : '<div style="margin-bottom:10px"><button data-voltar>← Voltar para imóveis</button></div>'}
     ${devolvido ? `<div class="aviso" style="background:var(--destaque-claro);color:var(--destaque)"><b>Devolvido pelo gestor:</b> ${esc(F.obs_devolucao)}</div>` : ''}
     <div class="form">
       <div class="card">
@@ -632,8 +645,8 @@ function telaForm() {
         <div id="corpo">${corpoPasso()}</div>
         <div class="erro" id="erro"></div>
         <div class="nav">
-          <div style="display:flex;gap:8px">${passo > 0 ? '<button data-ant>Voltar</button>' : ''}<button data-rasc>Salvar rascunho</button></div>
-          ${passo < PASSOS.length - 1 ? '<button class="principal" data-prox>Próxima</button>' : '<button class="principal" data-enviar>Enviar para aprovação</button>'}
+          <div style="display:flex;gap:8px">${passo > 0 ? '<button data-ant>Voltar</button>' : ''}<button data-rasc>${LINK ? 'Salvar e terminar depois' : 'Salvar rascunho'}</button></div>
+          ${passo < PASSOS.length - 1 ? '<button class="principal" data-prox>Próxima</button>' : `<button class="principal" data-enviar>${LINK ? 'Enviar agenciamento' : 'Enviar para aprovação'}</button>`}
         </div>
       </div>
       <div id="placar">${placar(F)}</div>
@@ -642,6 +655,7 @@ function telaForm() {
 function atualizarPlacar() { const p = document.getElementById('placar'); if (p) p.innerHTML = placar(F); }
 function abrirForm(im) { F = JSON.parse(JSON.stringify(im)); passo = 0; tela = { nome: 'form' }; render(); }
 async function gravarF(status) {
+  if (LINK) return gravarLink(status === 'enviar');
   const antes = F.status;
   if (status) F.status = status;
   const linha = paraLinha(F);
@@ -660,7 +674,7 @@ function telaDetalhe() {
   if (!im) { tela = { nome: 'lista' }; return telaLista(); }
   const st = STATUS[im.status];
   const at = situacaoAtualizacao(im);
-  const podeEditar = !gestor() && im.corretor === usuario && (im.status === 'rascunho' || im.status === 'devolvido');
+  const podeEditar = !gestor() && im.corretor === usuario && ['rascunho', 'revisao', 'devolvido'].includes(im.status);
   const L = (a, b) => vazio(b) || (Array.isArray(b) && !b.length) ? '' : `<div class="linha"><span>${a}</span><span>${esc(Array.isArray(b) ? b.join(', ') : b)}</span></div>`;
   const doc = (n, v, k) => `<div class="linha"><span>${n}</span><span>${v ? `<span class="selo verde">${esc(v)}</span>${im.arqs && im.arqs[k] ? ` <button class="link" data-verarq="${esc(im.arqs[k])}">abrir</button>` : ''}` : '<span class="selo vermelho">Falta</span>'}</span></div>`;
   return `
@@ -672,10 +686,11 @@ function telaDetalhe() {
           <div style="color:var(--suave);font-size:14px">${esc(im.end)}, ${esc(im.cidade)}${im.uf ? '/' + esc(im.uf) : ''}${im.cep ? ' · CEP ' + esc(im.cep) : ''} · ${codigoTxt(im)}${im.codigo_imoview ? ' · Imoview ' + esc(im.codigo_imoview) : ''} · ${esc(CORRETORES[im.corretor] || '')}</div>
           <div class="selos" style="margin-top:6px"><span class="selo ${st.c}">${st.t}</span>${at ? `<span class="selo ${at.c}">${at.t}</span>` : ''}</div></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            ${podeEditar ? `<button class="principal" data-editar="${im.id}">${im.status === 'devolvido' ? 'Ajustar e reenviar' : 'Continuar cadastro'}</button>` : ''}
+            ${podeEditar ? `<button class="principal" data-editar="${im.id}">${im.status === 'devolvido' ? 'Ajustar e reenviar' : im.status === 'revisao' ? 'Revisar e enviar ao gestor' : 'Continuar cadastro'}</button>` : ''}
             ${im.status === 'ativo' && (gestor() || im.corretor === usuario) ? `<button data-atualizei="${im.id}">Registrar atualização com o proprietário</button>` : ''}
           </div>
         </div>
+        ${im.status === 'revisao' ? `<div class="aviso" style="background:var(--ambar-claro);color:var(--ambar);margin-top:12px">Veio do link no celular${im.link_enviado ? '' : ' (ficou pela metade)'}. Confira a ficha, ajuste o que faltou e envie ao gestor.</div>` : ''}
         ${im.status === 'devolvido' && im.obs_devolucao ? `<div class="aviso" style="background:var(--destaque-claro);color:var(--destaque);margin-top:12px"><b>Motivo da devolução:</b> ${esc(im.obs_devolucao)}</div>` : ''}
         ${at && at.n >= 61 ? `<div class="aviso" style="background:var(--vermelho-claro);color:var(--vermelho);margin-top:12px">Passou de 60 dias sem atualização: pela regra, a posse deste agenciamento passa para outro corretor.</div>` : ''}
         <div class="bloco" style="margin-top:14px"><h3>Dados</h3>
@@ -796,7 +811,7 @@ async function enviarArquivos(k, arquivos) {
   const nomeSeguro = (n) => n.normalize('NFD').replace(/[^\w.-]+/g, '_').slice(-80);
   let falhas = 0;
   for (const f of arquivos) {
-    const path = `${sessao.user.id}/${F.id}/${k}-${Date.now()}-${nomeSeguro(f.name)}`;
+    const path = `${LINK ? 'link/' + LINK.token : sessao.user.id}/${F.id}/${k}-${Date.now()}-${nomeSeguro(f.name)}`;
     const { error } = await db.storage.from('crm-vendas').upload(path, f, { contentType: f.type || undefined });
     if (error) { falhas++; continue; }
     if (k === 'fotos') {
@@ -828,6 +843,7 @@ document.addEventListener('click', e => {
   const ds = b.dataset;
   if (ds.aba) { tela = { nome: ds.aba }; if (ds.aba === 'painel') PNL.dados = null; if (ds.aba === 'ativ') ATV.carregado = false; if (ds.aba === 'pontos') PTS.carregado = false; if (ds.aba === 'comissao') COM.carregado = false; render(); }
   else if (ds.abrir) { tela = { nome: 'det', id: ds.abrir }; render(); }
+  else if (ds.frev !== undefined) { filtro.status = 'revisao'; render(); }
   else if (ds.voltar !== undefined) { tela = { nome: gestor() && tela.nome === 'det' && DB.imoveis.find(i => i.id === tela.id)?.status === 'aguardando' ? 'aprovacao' : 'lista' }; render(); }
   else if (ds.novo !== undefined) abrirForm(novoImovel(usuario));
   else if (ds.editar) abrirForm(DB.imoveis.find(i => i.id === ds.editar));
@@ -849,13 +865,20 @@ document.addEventListener('click', e => {
     atualizarPlacar();
   }
   else if (ds.ir !== undefined) { const alvo = +ds.ir; if (alvo > passo && validarPasso()) { document.getElementById('erro').textContent = validarPasso(); return; } passo = alvo; render(); }
-  else if (ds.prox !== undefined) { const er = validarPasso(); if (er) { document.getElementById('erro').textContent = er; return; } passo++; render(); }
+  else if (ds.prox !== undefined) { const er = validarPasso(); if (er) { document.getElementById('erro').textContent = er; return; } passo++; render(); if (LINK && F.tipo) gravarLink(false); }
   else if (ds.ant !== undefined) { passo--; render(); }
   else if (ds.rasc !== undefined) {
     if (!F.tipo) { document.getElementById('erro').textContent = 'Escolha pelo menos o tipo do imóvel para salvar.'; return; }
-    gravarF(F.status === 'devolvido' ? 'devolvido' : 'rascunho').then(ok => { if (ok) { aviso('Rascunho salvo.'); tela = { nome: 'lista' }; render(); } });
+    if (LINK) { gravarF().then(ok => { if (ok) { tela = { nome: 'enviado', id: F.id, parcial: true }; render(); } }); return; }
+    gravarF(F.status === 'devolvido' ? 'devolvido' : F.status === 'revisao' ? 'revisao' : 'rascunho').then(ok => { if (ok) { aviso('Rascunho salvo.'); tela = { nome: 'lista' }; render(); } });
   }
   else if (ds.enviar !== undefined) {
+    if (LINK) {
+      const er = validarPasso(); if (er) { document.getElementById('erro').textContent = er; return; }
+      b.disabled = true;
+      gravarF('enviar').then(ok => { b.disabled = false; if (ok) { tela = { nome: 'enviado', id: F.id }; render(); } });
+      return;
+    }
     const { completo, linhas } = pontuar(F);
     if (!completo || !F.mat_num) {
       const faltam = (F.mat_num ? [] : ['número da matrícula']).concat(linhas.filter(l => l.o && !l.ok).map(l => l.l.toLowerCase()));
@@ -892,8 +915,15 @@ document.addEventListener('click', e => {
 // Link direto de cadastro: ...#novo abre o formulário vazio na hora
 let modoLink = location.hash === '#novo';
 function telaEnviado() {
-  const im = DB.imoveis.find(i => i.id === tela.id);
+  const im = LINK || tela.parcial ? F : DB.imoveis.find(i => i.id === tela.id);
   const { total } = pontuar(im);
+  if (LINK) return `<div class="card" style="max-width:520px;margin:40px auto;text-align:center">
+    <div style="font-size:40px;color:var(--${tela.parcial ? 'ambar' : 'verde'})">${tela.parcial ? '⏸' : '✓'}</div>
+    <h2 style="margin:6px 0">${tela.parcial ? 'Ficha salva' : 'Agenciamento enviado'}</h2>
+    <p style="color:var(--suave)">${codigoTxt(im)} · ${esc(TIPOS[im.tipo] || 'Imóvel')} · ${esc(im.bairro || '')} · nota ${total}</p>
+    <p style="color:var(--suave);font-size:14px">${tela.parcial ? 'O que você preencheu já está no CRM em <b>Em revisão</b>. Termine pelo CRM, já logado.' : 'Ele já está no CRM em <b>Em revisão</b>. Na imobiliária, entre no CRM, confira a ficha e envie ao gestor.'}</p>
+    <button class="principal" data-outro style="margin-top:8px">Cadastrar outro imóvel</button>
+    <div class="dica" style="margin-top:6px">Para cadastrar outro, pede seu nome e número de novo.</div></div>`;
   return `<div class="card" style="max-width:520px;margin:40px auto;text-align:center">
     <div style="font-size:40px;color:var(--verde)">✓</div>
     <h2 style="margin:6px 0">Imóvel enviado para aprovação</h2>
@@ -905,7 +935,7 @@ function telaEnviado() {
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.outro !== undefined) abrirForm(novoImovel(usuario));
+  if (b.dataset.outro !== undefined) { if (LINK) sairLink(); else abrirForm(novoImovel(usuario)); }
   if (b.dataset.meus !== undefined) { modoLink = false; history.replaceState(null, '', location.pathname); tela = { nome: 'lista' }; render(); }
 });
 // ---------- funis: Pré-atendimento (SDR) e Funil de vendas (funil "Atendimento" do CRM Leads) ----------
@@ -1865,7 +1895,37 @@ $('vercomo').addEventListener('change', async (e) => {
   tela = { nome: 'funil' }; render();
 });
 $('sair').addEventListener('click', async () => { await db.auth.signOut(); entrar(null); });
-db.auth.getSession().then(({ data }) => entrar(data.session));
+// ---------- link do celular: entra com nome + 4 últimos números (sem senha) ----------
+let LINK = null; // { token, corretor, nome }
+async function abrirLink() {
+  $('login').hidden = true; $('app').hidden = true; $('quem').hidden = true; $('abas').innerHTML = '';
+  $('link-entrada').hidden = false; $('link-digitos').value = ''; $('erro-link').textContent = '';
+  const { data } = await db.rpc('crm_vendas_link_corretores');
+  $('link-corretor').innerHTML = '<option value="">Escolha seu nome</option>' + (data || []).map(c => `<option value="${c.id}">${esc(c.nome)}</option>`).join('');
+}
+function sairLink() { LINK = null; usuario = null; F = null; tela = { nome: 'form' }; abrirLink(); }
+$('form-link').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const bt = e.target.querySelector('button'); bt.disabled = true;
+  const { data, error } = await db.rpc('crm_vendas_link_entrar', { p_corretor: $('link-corretor').value, p_digitos: $('link-digitos').value });
+  bt.disabled = false;
+  if (error || !data || data.erro) { $('erro-link').textContent = data?.erro || 'Não foi possível entrar agora. Tente de novo.'; return; }
+  LINK = data; usuario = data.corretor;
+  $('link-entrada').hidden = true; $('app').hidden = false;
+  abrirForm(novoImovel(data.corretor));
+});
+async function gravarLink(enviar) {
+  const linha = paraLinha(F);
+  const { data, error } = await db.rpc('crm_vendas_link_salvar', {
+    p_token: LINK.token, p_id: F.id, p_tipo: linha.tipo, p_codigo_imoview: linha.codigo_imoview,
+    p_dados: linha.dados, p_nota: linha.nota, p_enviar: !!enviar,
+  });
+  const el = document.getElementById('erro');
+  if (error || !data || data.erro) { if (el) el.textContent = data?.erro || 'Não foi possível salvar. Confira a internet e tente de novo.'; return null; }
+  F.codigo = data.codigo; F.status = 'revisao';
+  return data;
+}
+if (modoLink) abrirLink(); else db.auth.getSession().then(({ data }) => entrar(data.session));
 </script>
 </body>
 </html>

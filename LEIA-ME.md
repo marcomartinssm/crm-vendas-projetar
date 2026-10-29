@@ -102,6 +102,13 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 - Tarefa agendada do Claude (app no Mac) **crm-vendas-descricoes-imoveis**: de hora em hora, 8h–19h, seg–sáb. Lê `crm_vendas_descricoes_pendentes()` e grava com `crm_vendas_salvar_descricao(id, json)` (em `dados.descricao_seo`). Só roda com o app do Claude aberto no Mac.
 - A edge function `crm-vendas-descricao` (API, precisa de `ANTHROPIC_API_KEY`) ficou como alternativa, sem uso pela tela.
 
+## Link de agenciamento no celular (`.../#novo`)
+- O corretor abre o link, escolhe o nome e digita os **4 últimos números do celular** do cadastro de corretores (sem senha). 5 erros seguidos = bloqueio de 1 hora para aquele corretor. Aparecem na lista os corretores do game (`crm_vendas_link_corretores`).
+- Funções (abertas para quem não está logado): `crm_vendas_link_entrar` (devolve um token que vale 12h) e `crm_vendas_link_salvar` (grava a ficha). Tabelas só do servidor: `crm_vendas_link_sessoes`, `crm_vendas_link_tentativas`.
+- A ficha é a mesma. Salva sozinha a cada "Próxima". "Enviar agenciamento" encerra o token: para cadastrar outro, pede nome e número de novo.
+- Tudo o que vem do link entra com status **`revisao` ("Em revisão", amarelo)**, nunca direto para o gestor. O corretor, logado no CRM, abre ("Revisar e enviar ao gestor"), ajusta e envia → `aguardando` (aí sim exige os obrigatórios).
+- Arquivos do link: pasta `link/<token>/<imóvel>/...` no bucket `crm-vendas` (políticas `crm_vendas_arq_link_envia` / `_le`: o corretor dono do token lê depois; o gestor lê tudo).
+
 ## Endereço publicado
 - https://marcomartinssm.github.io/crm-vendas-projetar/ (link direto de cadastro de imóvel: `.../#novo`)
 - Repositório público `marcomartinssm/crm-vendas-projetar` (GitHub Pages, branch main, raiz). Para atualizar: commit + push na main; o site atualiza em ~1 minuto.
