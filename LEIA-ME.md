@@ -110,7 +110,7 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 - Arquivos do link: pasta `link/<token>/<imóvel>/...` no bucket `crm-vendas` (políticas `crm_vendas_arq_link_envia` / `_le`: o corretor dono do token lê depois; o gestor lê tudo).
 
 ## Proprietário (na ficha do imóvel)
-- Etapa 6 "Proprietário e documentos": nome* e celular* (com DDD) do proprietário, CPF, e-mail, estado civil (casado/união estável abre nome e CPF do cônjuge) e outros proprietários. Fica em `dados` (prop_nome, prop_tel, prop_cpf, prop_email, prop_civil, conj_nome, conj_cpf, prop_outros). Nome e celular travam a etapa e o envio ao gestor.
+- Etapa 6 "Proprietário e documentos": nome* e celular* (com DDD) do proprietário, CPF, e-mail, profissão, estado civil, endereço do proprietário e outros proprietários (sem RG e sem cônjuge, decisão do Marco 29/10). Fica em `dados` (prop_nome, prop_tel, prop_cpf, prop_email, prop_prof, prop_civil, prop_end, prop_outros). Nome e celular travam a etapa e o envio ao gestor.
 - Esses campos são tirados de `crm_vendas_descricoes_pendentes()`: não vão para a IA da descrição.
 
 ## Endereço publicado

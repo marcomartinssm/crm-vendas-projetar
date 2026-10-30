@@ -306,7 +306,7 @@ function novoImovel(corretor) {
     area: '', area_global: '', area_terreno: '', salas: '', vaga_tipo: '', andares: '', unid_andar: '', elevadores: '', medidas: '', frente: '', laterais: '', area_auto: true, quartos: '', suites: '', banh: '', copa: '', vagas: '', andar: '', posicao: '', divisorias: '',
     usos: '', zoneamento: '', topografia: '', loteamento: '', infra: [], lazer: [], intr: [], ext: [],
     estado: '', dest: [], perto: [], perfil: [], frase: '',
-    prop_nome: '', prop_tel: '', prop_cpf: '', prop_email: '', prop_civil: '', conj_nome: '', conj_cpf: '', prop_outros: '',
+    prop_nome: '', prop_tel: '', prop_cpf: '', prop_email: '', prop_civil: '', prop_prof: '', prop_end: '', prop_outros: '',
     mat_num: '', mat_cartorio: '', mat_arq: '', mat_data: '', cnh_arq: '', comp_arq: '', aver: '', aver_arq: '', cnd_arq: '',
     fotos: [], fotos_paths: [], arqs: {}, fachada: false, drone_arq: '', placa_arq: '', placa_proib_arq: '', video: '', chave: false, relatorio: false,
     historico: [],
@@ -586,8 +586,8 @@ function corpoPasso() {
     <div class="q"><label>Proprietário</label>
       <div class="grade">${campo('prop_nome', 'Nome completo *', 'Como está no documento')}${campo('prop_tel', 'Celular / WhatsApp *', '(48) 99999-9999', 'tel')}</div>
       <div class="grade">${campo('prop_cpf', 'CPF', '000.000.000-00')}${campo('prop_email', 'E-mail', 'nome@email.com', 'email')}</div>
-      <div class="grade">${escolha('prop_civil', 'Estado civil', [['solteiro', 'Solteiro(a)'], ['casado', 'Casado(a)'], ['uniao', 'União estável'], ['divorciado', 'Divorciado(a)'], ['viuvo', 'Viúvo(a)']])}</div>
-      ${['casado', 'uniao'].includes(F.prop_civil) ? `<div class="grade">${campo('conj_nome', 'Nome do cônjuge', '', 'text', 'O cônjuge também assina a autorização de venda.')}${campo('conj_cpf', 'CPF do cônjuge', '000.000.000-00')}</div>` : ''}
+      <div class="grade">${campo('prop_prof', 'Profissão', 'Ex.: comerciante')}${escolha('prop_civil', 'Estado civil', [['solteiro', 'Solteiro(a)'], ['casado', 'Casado(a)'], ['uniao', 'União estável'], ['divorciado', 'Divorciado(a)'], ['viuvo', 'Viúvo(a)']])}</div>
+      ${campo('prop_end', 'Endereço do proprietário', 'Rua, número, bairro, cidade', 'text', 'Onde ele mora (pode ser diferente do imóvel).')}
       ${campo('prop_outros', 'Outros proprietários (se tiver)', 'Nome e celular de cada um')}
     </div>
     <div class="q"><label>Documentos do proprietário</label>
@@ -719,7 +719,7 @@ function telaDetalhe() {
             ${im.descricao_seo ? blocoDescricao(im.descricao_seo) : (im.status === 'rascunho' && !im.pedir_descricao ? '<div class="dica" style="margin-top:6px">Ainda não pedida. Ela é escrita sozinha quando o imóvel for enviado para aprovação.</div>' : '')}</div>
         </div>
         <div class="bloco"><h3>Proprietário</h3>
-          ${im.prop_nome ? `${L('Nome', im.prop_nome)}${L('Celular', im.prop_tel)}${L('CPF', im.prop_cpf)}${L('E-mail', im.prop_email)}${L('Estado civil', { solteiro: 'Solteiro(a)', casado: 'Casado(a)', uniao: 'União estável', divorciado: 'Divorciado(a)', viuvo: 'Viúvo(a)' }[im.prop_civil])}${L('Cônjuge', [im.conj_nome, im.conj_cpf].filter(Boolean).join(' · '))}${L('Outros proprietários', im.prop_outros)}` : '<div class="dica">Não informado. Abra a ficha e preencha.</div>'}
+          ${im.prop_nome ? `${L('Nome', im.prop_nome)}${L('Celular', im.prop_tel)}${L('CPF', im.prop_cpf)}${L('E-mail', im.prop_email)}${L('Estado civil', { solteiro: 'Solteiro(a)', casado: 'Casado(a)', uniao: 'União estável', divorciado: 'Divorciado(a)', viuvo: 'Viúvo(a)' }[im.prop_civil])}${L('Profissão', im.prop_prof)}${L('Endereço', im.prop_end)}${L('Outros proprietários', im.prop_outros)}` : '<div class="dica">Não informado. Abra a ficha e preencha.</div>'}
         </div>
         <div class="bloco"><h3>Documentos</h3>
           ${L('Número da matrícula', im.mat_num)}${L('Cartório', im.mat_cartorio)}${doc('PDF da matrícula' + (im.mat_data ? ` (emitida há ${dias(im.mat_data)} dias)` : ''), im.mat_arq, 'mat_arq')}${doc('CNH / RG e CPF', im.cnh_arq, 'cnh_arq')}${doc('Comprovante de endereço', im.comp_arq, 'comp_arq')}
@@ -785,7 +785,6 @@ document.addEventListener('change', e => {
   if (t.id === 'fstatus') { filtro.status = t.value; render(); return; }
   if (tela.nome !== 'form') return;
   if (t.tagName === 'SELECT' && t.dataset.k) { F[t.dataset.k] = t.value;
-    if (t.dataset.k === 'prop_civil') document.getElementById('corpo').innerHTML = corpoPasso();
     if (t.dataset.k === 'aver') { if (t.value === 'nao') F.fin = 'nao'; document.getElementById('corpo').innerHTML = corpoPasso(); } if (t.dataset.k === 'mat_data' || t.dataset.k === 'loteamento') document.getElementById('corpo').innerHTML = corpoPasso(); atualizarPlacar(); }
   if (t.type === 'date') { document.getElementById('corpo').innerHTML = corpoPasso(); }
   if (t.dataset.b) { F[t.dataset.b] = t.checked; atualizarPlacar(); }
