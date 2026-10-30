@@ -495,7 +495,8 @@ function escolha(k, label, ops) {
 function chips(k, label, ops, max, dica = '') {
   const um = max === 1;
   return `<div class="q"><label>${label}</label><div class="chips">${ops.map(o => {
-    const on = um ? F[k] === o : F[k].includes(o);
+    // O tipo fica guardado como chave (casa, apto...) e o botão mostra o nome.
+    const on = k === 'tipo_btn' ? TIPOS[F.tipo] === o : um ? F[k] === o : F[k].includes(o);
     return `<button type="button" data-chip="${k}" data-max="${max || 0}" data-v="${esc(o)}" class="${on ? 'on' : ''}">${esc(o)}</button>`;
   }).join('')}</div>${dica ? `<div class="dica">${dica}</div>` : ''}</div>`;
 }
