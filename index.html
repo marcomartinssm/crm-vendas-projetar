@@ -350,6 +350,7 @@ let filtro = { busca: '', status: '' };
 let NOME_GESTOR = 'Gestor';
 let VER = null; // gestor vendo o sistema como um corretor (só visualização)
 let MEU_CORRETOR = null;
+let GESTOR_CORRETOR = null; // cadastro de corretor do gestor (pelo e-mail): o que ele agencia pelo link ele mesmo revisa
 const gestor = () => souAprovador && !VER;
 const meus = () => DB.imoveis;
 
@@ -416,7 +417,7 @@ function telaLista() {
   const q = filtro.busca.toLowerCase();
   const filtrados = lista.filter(i => (!filtro.status || i.status === filtro.status) &&
     (!q || [i.end, i.bairro, i.codigo, i.codigo_imoview, TIPOS[i.tipo], CORRETORES[i.corretor]].join(' ').toLowerCase().includes(q)));
-  const emRevisao = lista.filter(i => i.status === 'revisao' && (!gestor() || VER));
+  const emRevisao = lista.filter(i => i.status === 'revisao' && (!gestor() || i.corretor === GESTOR_CORRETOR));
   return `
     ${emRevisao.length ? `<button class="aviso" style="display:block;width:100%;text-align:left;border:none;background:var(--ambar-claro);color:var(--ambar)" data-frev>${emRevisao.length} agenciamento(s) do link <b>em revisão</b>: confira e envie ao gestor. Clique para ver.</button>` : ''}
     <div class="kpis">
@@ -674,7 +675,7 @@ function telaDetalhe() {
   if (!im) { tela = { nome: 'lista' }; return telaLista(); }
   const st = STATUS[im.status];
   const at = situacaoAtualizacao(im);
-  const podeEditar = !gestor() && im.corretor === usuario && ['rascunho', 'revisao', 'devolvido'].includes(im.status);
+  const podeEditar = ['rascunho', 'revisao', 'devolvido'].includes(im.status) && (!gestor() ? im.corretor === usuario : im.status === 'revisao' && im.corretor === GESTOR_CORRETOR);
   const L = (a, b) => vazio(b) || (Array.isArray(b) && !b.length) ? '' : `<div class="linha"><span>${a}</span><span>${esc(Array.isArray(b) ? b.join(', ') : b)}</span></div>`;
   const doc = (n, v, k) => `<div class="linha"><span>${n}</span><span>${v ? `<span class="selo verde">${esc(v)}</span>${im.arqs && im.arqs[k] ? ` <button class="link" data-verarq="${esc(im.arqs[k])}">abrir</button>` : ''}` : '<span class="selo vermelho">Falta</span>'}</span></div>`;
   return `
@@ -1865,6 +1866,7 @@ async function entrar(s) {
   souAprovador = !!aprov; usuario = meu; MEU_CORRETOR = meu; VER = null;
   CORRETORES = Object.fromEntries((cors || []).map(c => [c.id, c.nome]));
   CORRETORES_ATIVOS = (cors || []).filter(c => c.ativo).sort((a, b) => a.nome.localeCompare(b.nome));
+  GESTOR_CORRETOR = souAprovador ? ((cors || []).find(c => (c.email || '').toLowerCase() === s.user.email.toLowerCase())?.id || null) : null;
   NOME_GESTOR = (CORRETORES[meu] || (cors || []).find(c => (c.email || '').toLowerCase() === s.user.email.toLowerCase())?.nome || s.user.email.split('@')[0]).split(' ')[0];
   NOME_GESTOR = NOME_GESTOR.charAt(0).toUpperCase() + NOME_GESTOR.slice(1);
   $('quem-nome').textContent = souAprovador ? `${NOME_GESTOR} · gestor` : (CORRETORES[usuario] || s.user.email);
