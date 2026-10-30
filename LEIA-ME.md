@@ -109,6 +109,10 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 - Tudo o que vem do link entra com status **`revisao` ("Em revisão", amarelo)**, nunca direto para o gestor. O corretor, logado no CRM, abre ("Revisar e enviar ao gestor"), ajusta e envia → `aguardando` (aí sim exige os obrigatórios).
 - Arquivos do link: pasta `link/<token>/<imóvel>/...` no bucket `crm-vendas` (políticas `crm_vendas_arq_link_envia` / `_le`: o corretor dono do token lê depois; o gestor lê tudo).
 
+## Proprietário (na ficha do imóvel)
+- Etapa 6 "Proprietário e documentos": nome* e celular* (com DDD) do proprietário, CPF, e-mail, estado civil (casado/união estável abre nome e CPF do cônjuge) e outros proprietários. Fica em `dados` (prop_nome, prop_tel, prop_cpf, prop_email, prop_civil, conj_nome, conj_cpf, prop_outros). Nome e celular travam a etapa e o envio ao gestor.
+- Esses campos são tirados de `crm_vendas_descricoes_pendentes()`: não vão para a IA da descrição.
+
 ## Endereço publicado
 - https://marcomartinssm.github.io/crm-vendas-projetar/ (link direto de cadastro de imóvel: `.../#novo`)
 - Repositório público `marcomartinssm/crm-vendas-projetar` (GitHub Pages, branch main, raiz). Para atualizar: commit + push na main; o site atualiza em ~1 minuto.

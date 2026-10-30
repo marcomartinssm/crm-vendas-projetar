@@ -306,6 +306,7 @@ function novoImovel(corretor) {
     area: '', area_global: '', area_terreno: '', salas: '', vaga_tipo: '', andares: '', unid_andar: '', elevadores: '', medidas: '', frente: '', laterais: '', area_auto: true, quartos: '', suites: '', banh: '', copa: '', vagas: '', andar: '', posicao: '', divisorias: '',
     usos: '', zoneamento: '', topografia: '', loteamento: '', infra: [], lazer: [], intr: [], ext: [],
     estado: '', dest: [], perto: [], perfil: [], frase: '',
+    prop_nome: '', prop_tel: '', prop_cpf: '', prop_email: '', prop_civil: '', conj_nome: '', conj_cpf: '', prop_outros: '',
     mat_num: '', mat_cartorio: '', mat_arq: '', mat_data: '', cnh_arq: '', comp_arq: '', aver: '', aver_arq: '', cnd_arq: '',
     fotos: [], fotos_paths: [], arqs: {}, fachada: false, drone_arq: '', placa_arq: '', placa_proib_arq: '', video: '', chave: false, relatorio: false,
     historico: [],
@@ -473,7 +474,7 @@ document.addEventListener('click', async e => {
 });
 
 // ---------- formulário ----------
-const PASSOS = ['Tipo e endereço', 'Valores', 'Áreas e cômodos', 'Características', 'Sobre o imóvel', 'Documentos', 'Fotos e divulgação'];
+const PASSOS = ['Tipo e endereço', 'Valores', 'Áreas e cômodos', 'Características', 'Sobre o imóvel', 'Proprietário e documentos', 'Fotos e divulgação'];
 const OPC = {
   lazer: { casa: ['Piscina', 'Churrasqueira', 'Pátio', 'Área gourmet', 'Jardim', 'Playground'], apto: ['Piscina', 'Salão de festas', 'Academia', 'Playground', 'Churrasqueira', 'Espaço gourmet'], terreno: ['Área verde', 'Quadra', 'Playground', 'Portaria 24h', 'Clube', 'Ciclovia'] },
   intr: { casa: ['Armários', 'Ar-condicionado', 'Suíte', 'Lavanderia', 'Lareira', 'Cozinha integrada', 'Closet', 'Mobiliado'], apto: ['Armários', 'Ar-condicionado', 'Sacada com churrasqueira', 'Lavanderia', 'Cozinha integrada', 'Closet', 'Mobiliado'], sala: ['Ar-condicionado', 'Piso porcelanato', 'Rede elétrica nova', 'Rede lógica', 'Forro', 'Recepção'] },
@@ -582,6 +583,13 @@ function corpoPasso() {
       <div class="grade" style="margin:8px 0 4px">${campo('mat_data', 'Data de emissão da matrícula', '', 'date', F.mat_data && dias(F.mat_data) > 30 ? '<span style="color:var(--vermelho)">Emitida há mais de 30 dias: peça uma nova.</span>' : '')}</div>
     </div>
     ${t !== 'terreno' ? `<div class="q">${escolha('aver', constr + ' está averbad' + (t === 'casa' || t === 'sala' ? 'a' : 'o') + ' na matrícula?', [['sim', 'Sim, averbado'], ['nao', 'Não ou só parte averbada'], ['naosei', 'Não sei']])}${avisoAver}${F.aver === 'sim' ? anexo('aver_arq', 'Comprovante da averbação', 'Opcional: certidão ou página da matrícula com a averbação') : ''}</div>` : ''}
+    <div class="q"><label>Proprietário</label>
+      <div class="grade">${campo('prop_nome', 'Nome completo *', 'Como está no documento')}${campo('prop_tel', 'Celular / WhatsApp *', '(48) 99999-9999', 'tel')}</div>
+      <div class="grade">${campo('prop_cpf', 'CPF', '000.000.000-00')}${campo('prop_email', 'E-mail', 'nome@email.com', 'email')}</div>
+      <div class="grade">${escolha('prop_civil', 'Estado civil', [['solteiro', 'Solteiro(a)'], ['casado', 'Casado(a)'], ['uniao', 'União estável'], ['divorciado', 'Divorciado(a)'], ['viuvo', 'Viúvo(a)']])}</div>
+      ${['casado', 'uniao'].includes(F.prop_civil) ? `<div class="grade">${campo('conj_nome', 'Nome do cônjuge', '', 'text', 'O cônjuge também assina a autorização de venda.')}${campo('conj_cpf', 'CPF do cônjuge', '000.000.000-00')}</div>` : ''}
+      ${campo('prop_outros', 'Outros proprietários (se tiver)', 'Nome e celular de cada um')}
+    </div>
     <div class="q"><label>Documentos do proprietário</label>
       ${anexo('cnh_arq', 'CNH ou RG e CPF do proprietário *', 'PDF ou foto')}
       ${anexo('comp_arq', 'Comprovante de endereço do proprietário *', 'PDF ou foto')}
@@ -710,6 +718,9 @@ function telaDetalhe() {
             ${im.pedir_descricao || (!im.descricao_seo && ['aguardando', 'ativo'].includes(im.status)) ? '<div class="dica" style="margin-top:6px">Na fila: a IA escreve em até 1 hora (de hora em hora, em horário comercial).</div>' : ''}
             ${im.descricao_seo ? blocoDescricao(im.descricao_seo) : (im.status === 'rascunho' && !im.pedir_descricao ? '<div class="dica" style="margin-top:6px">Ainda não pedida. Ela é escrita sozinha quando o imóvel for enviado para aprovação.</div>' : '')}</div>
         </div>
+        <div class="bloco"><h3>Proprietário</h3>
+          ${im.prop_nome ? `${L('Nome', im.prop_nome)}${L('Celular', im.prop_tel)}${L('CPF', im.prop_cpf)}${L('E-mail', im.prop_email)}${L('Estado civil', { solteiro: 'Solteiro(a)', casado: 'Casado(a)', uniao: 'União estável', divorciado: 'Divorciado(a)', viuvo: 'Viúvo(a)' }[im.prop_civil])}${L('Cônjuge', [im.conj_nome, im.conj_cpf].filter(Boolean).join(' · '))}${L('Outros proprietários', im.prop_outros)}` : '<div class="dica">Não informado. Abra a ficha e preencha.</div>'}
+        </div>
         <div class="bloco"><h3>Documentos</h3>
           ${L('Número da matrícula', im.mat_num)}${L('Cartório', im.mat_cartorio)}${doc('PDF da matrícula' + (im.mat_data ? ` (emitida há ${dias(im.mat_data)} dias)` : ''), im.mat_arq, 'mat_arq')}${doc('CNH / RG e CPF', im.cnh_arq, 'cnh_arq')}${doc('Comprovante de endereço', im.comp_arq, 'comp_arq')}
           ${im.tipo !== 'terreno' ? `<div class="linha"><span>Averbação</span><span>${im.aver === 'sim' ? '<span class="selo verde">Averbado · pode financiar</span>' : im.aver === 'nao' ? '<span class="selo vermelho">Não averbado · sem financiamento</span>' : '<span class="selo ambar">Não informado</span>'}</span></div>` : ''}
@@ -774,6 +785,7 @@ document.addEventListener('change', e => {
   if (t.id === 'fstatus') { filtro.status = t.value; render(); return; }
   if (tela.nome !== 'form') return;
   if (t.tagName === 'SELECT' && t.dataset.k) { F[t.dataset.k] = t.value;
+    if (t.dataset.k === 'prop_civil') document.getElementById('corpo').innerHTML = corpoPasso();
     if (t.dataset.k === 'aver') { if (t.value === 'nao') F.fin = 'nao'; document.getElementById('corpo').innerHTML = corpoPasso(); } if (t.dataset.k === 'mat_data' || t.dataset.k === 'loteamento') document.getElementById('corpo').innerHTML = corpoPasso(); atualizarPlacar(); }
   if (t.type === 'date') { document.getElementById('corpo').innerHTML = corpoPasso(); }
   if (t.dataset.b) { F[t.dataset.b] = t.checked; atualizarPlacar(); }
@@ -836,6 +848,7 @@ function validarPasso() {
   if (passo === 0 && (!F.cep || !F.rua || !F.numero || !F.bairro || !F.cidade)) return 'Preencha CEP, rua, número, bairro e cidade.';
   if (passo === 1 && !(+F.venda > 0)) return 'Informe o valor de venda.';
   if (passo === 5 && !String(F.mat_num).trim()) return 'Informe o número da matrícula para continuar.';
+  if (passo === 5 && (!String(F.prop_nome).trim() || String(F.prop_tel).replace(/\D/g, '').length < 10)) return 'Informe o nome e o celular do proprietário (com DDD) para continuar.';
   return '';
 }
 
@@ -882,8 +895,9 @@ document.addEventListener('click', e => {
       return;
     }
     const { completo, linhas } = pontuar(F);
-    if (!completo || !F.mat_num) {
-      const faltam = (F.mat_num ? [] : ['número da matrícula']).concat(linhas.filter(l => l.o && !l.ok).map(l => l.l.toLowerCase()));
+    const semDono = !String(F.prop_nome).trim() || String(F.prop_tel).replace(/\D/g, '').length < 10;
+    if (!completo || !F.mat_num || semDono) {
+      const faltam = (F.mat_num ? [] : ['número da matrícula']).concat(semDono ? ['nome e celular do proprietário'] : []).concat(linhas.filter(l => l.o && !l.ok).map(l => l.l.toLowerCase()));
       document.getElementById('erro').textContent = 'Para enviar, falta: ' + faltam.join(', ') + '.';
       return;
     }
