@@ -621,7 +621,10 @@ function blocoDescricao(dsc, pedida) {
     <div class="dica" style="margin-top:6px">Meta description (${(dsc.meta_description || '').length}/155)</div><div>${esc(dsc.meta_description)}</div>
     <div class="dica" style="margin-top:6px">Palavra-chave: ${esc(dsc.palavra_chave)}${dsc.long_tails?.length ? ' · ' + dsc.long_tails.map(esc).join(' · ') : ''}</div>
     <h3 style="font-size:16px;margin:10px 0 4px">${esc(dsc.h1)}</h3>
-    ${(dsc.secoes || []).map(x => `<div style="font-weight:600;margin-top:6px">${esc(x.h2)}</div><div style="line-height:1.6">${esc(x.texto)}</div>`).join('')}</div>`;
+    ${dsc.destaques?.length ? `<ul style="margin:6px 0;padding-left:20px;line-height:1.6">${dsc.destaques.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+    ${(dsc.secoes || []).map(x => `<div style="font-weight:600;margin-top:6px">${esc(x.h2)}</div><div style="line-height:1.6">${esc(x.texto)}</div>`).join('')}
+    ${dsc.url_slug ? `<div class="dica" style="margin-top:10px">Endereço sugerido da página: ${esc(dsc.url_slug)}</div>` : ''}
+    ${dsc.schema ? `<details style="margin-top:6px"><summary class="dica" style="cursor:pointer">Etiqueta para o Google (Schema), para colar no site</summary><pre style="white-space:pre-wrap;word-break:break-word;font-size:12px;margin:6px 0 0">${esc('<script type="application/ld+json">\n' + JSON.stringify(dsc.schema, null, 2) + '\n<\/script>')}</pre></details>` : ''}</div>`;
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-gerardesc]'); if (!b || !F) return;

@@ -113,6 +113,9 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 - Etapa 6 "Proprietário e documentos": nome* e celular* (com DDD) do proprietário, CPF, e-mail, profissão, estado civil, endereço do proprietário e outros proprietários (sem RG e sem cônjuge, decisão do Marco 29/10). Fica em `dados` (prop_nome, prop_tel, prop_cpf, prop_email, prop_prof, prop_civil, prop_end, prop_outros). Nome e celular travam a etapa e o envio ao gestor.
 - Esses campos são tirados de `crm_vendas_descricoes_pendentes()`: não vão para a IA da descrição.
 
+## Descrição do anúncio: o que a IA devolve (01/11/2026)
+- Além de título, meta, H1 e seções: `destaques` (lista curta), `url_slug` (endereço sugerido da página) e `schema` (etiqueta para colar no site). Regras na tarefa `crm-vendas-descricoes-imoveis`: abre com os trunfos, frases prontas proibidas, nunca rua/número/CEP em texto público. O Google não tem resultado especial para imóvel à venda (galeria conferida em 01/11/2026): o Schema só ajuda a ler a página.
+
 ## Endereço publicado
 - https://marcomartinssm.github.io/crm-vendas-projetar/ (link direto de cadastro de imóvel: `.../#novo`)
 - Repositório público `marcomartinssm/crm-vendas-projetar` (GitHub Pages, branch main, raiz). Para atualizar: commit + push na main; o site atualiza em ~1 minuto.
