@@ -1,0 +1,66 @@
+# Vigia do servidor: a cada 5 minutos testa o Supabase. Se cair (3 tentativas sem resposta), avisa no grupo uma vez;
+# quando voltar, avisa de novo. O aviso sai pela função servidor-monitor (que não depende do banco).
+# O estado (no ar / fora desde quando) fica guardado no cache do GitHub entre uma rodada e outra.
+name: Vigia do servidor
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: servidor-monitor
+  cancel-in-progress: false
+
+jobs:
+  vigiar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Estado anterior
+        uses: actions/cache/restore@v4
+        with:
+          path: estado
+          key: monitor-estado-${{ github.run_id }}
+          restore-keys: monitor-estado-
+
+      - name: Testar e avisar
+        env:
+          URL: https://jgdbnkwhmesgjvsymgma.supabase.co
+          ANON: sb_publishable_qvAy43WiHGUyk0aitpg_WQ_2xYfKEKu
+          MONITOR_TOKEN: ${{ secrets.MONITOR_TOKEN }}
+          MONITOR_DESTINO: ${{ secrets.MONITOR_DESTINO }}
+        run: |
+          # estado: "ok"  ou  "fora <desde> <avisado 0|1>"
+          read -r situacao desde avisado < estado 2>/dev/null || situacao=ok
+          no_ar=0
+          for i in 1 2 3; do
+            c=$(curl -s -m 20 -o /dev/null -w "%{http_code}" -H "apikey: $ANON" "$URL/rest/v1/fases?select=id&limit=1" || true)
+            echo "tentativa $i: $c"
+            if [ "$c" = "200" ]; then no_ar=1; break; fi
+            [ $i -lt 3 ] && sleep 40
+          done
+
+          avisar() {
+            body=$(jq -n --arg t "$MONITOR_TOKEN" --arg d "$MONITOR_DESTINO" --arg e "$1" --arg s "$2" '{token:$t,destino:$d,evento:$e,desde:$s}')
+            r=$(curl -s -m 40 -X POST -H "Content-Type: application/json" -d "$body" "$URL/functions/v1/servidor-monitor" || true)
+            echo "aviso $1: $r"
+            echo "$r" | grep -q '"enviado":true'
+          }
+
+          if [ $no_ar = 1 ]; then
+            if [ "$situacao" = "fora" ] && [ "$avisado" = "1" ]; then avisar voltou "$desde" || true; fi
+            echo ok > estado
+          else
+            [ "$situacao" = "fora" ] || { desde=$(date -u +%Y-%m-%dT%H:%M:%SZ); avisado=0; }
+            if [ "$avisado" != "1" ] && avisar caiu "$desde"; then avisado=1; fi
+            echo "fora $desde $avisado" > estado
+          fi
+          echo "estado agora: $(cat estado)"
+
+      - name: Guardar estado
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: estado
+          key: monitor-estado-${{ github.run_id }}

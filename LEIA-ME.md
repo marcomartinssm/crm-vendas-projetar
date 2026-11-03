@@ -121,6 +121,12 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 - Repositório público `marcomartinssm/crm-vendas-projetar` (GitHub Pages, branch main, raiz). Para atualizar: commit + push na main; o site atualiza em ~1 minuto.
 - O CRM Leads continua separado (`crmleads-projetar`), como segurança.
 
+## Vigia do servidor (aviso de queda no grupo)
+- O GitHub (`.github/workflows/servidor-monitor.yml`) testa o Supabase a cada 5 minutos (3 tentativas). Se cair, avisa no grupo uma vez, com o passo a passo para reiniciar; quando voltar, avisa de novo com quanto tempo ficou fora.
+- Quem manda a mensagem é a função `servidor-monitor`, que não depende do banco. Ela só aceita o token e o destino que estão nos segredos do GitHub (`MONITOR_TOKEN`, `MONITOR_DESTINO` = `instancia|grupo`); no código ficam só os hashes.
+- O agendamento do GitHub pode atrasar alguns minutos.
+- Queda de 03/11/2026 (12h–14h27): servidor do plano gratuito parou por falta de recurso. Depois disso as tarefas do sistema de disparos (jobs 4, 5 e 6) foram desligadas e o histórico do cron antes de 15/10 foi apagado.
+
 ## Abrir no Mac
 ```
 python3 -m http.server 8897 --directory "/Users/marcomartins/Documents/IA e automações/Claude/CRM Vendas - CC"
