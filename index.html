@@ -1125,9 +1125,9 @@ function cardLead(l, comEtapa) {
     <div class="ktopo"><span class="kav">${esc(iniciais(l.nome))}</span><b>${esc(l.nome || 'Sem nome')}</b></div>
     ${l.telefone ? `<div class="ktel">☏ ${esc(l.telefone)} <button class="kcopia" data-copiar="${esc(l.telefone)}" title="Copiar telefone" aria-label="Copiar telefone">⧉</button></div>` : ''}
     <div class="selos"><span class="selo vinho">${esc(l.origem || 'Sem origem')}</span>${l.codigo_imovel ? `<span class="selo">Cód. ${esc(l.codigo_imovel)}</span>` : ''}${l.valor_negociacao ? `<span class="selo">${brl(l.valor_negociacao)}</span>` : ''}</div>
-    ${gestor() ? `<div class="s" style="margin-top:4px">${esc(CORRETORES[l.corretor_id] || 'Sem corretor')}</div>` : ''}
+    ${gestor() || l.corretor_id !== usuario ? `<div class="s" style="margin-top:4px">${esc(CORRETORES[l.corretor_id] || 'Sem corretor')}</div>` : ''}
     <div class="kult ${u.alerta ? 'alerta' : ''}">${esc(u.t)}</div>
-    <button class="kmover" data-moverrapido="${l.id}">→ Mover etapa</button>
+    ${gestor() || l.corretor_id === usuario ? `<button class="kmover" data-moverrapido="${l.id}">→ Mover etapa</button>` : ''}
     ${podeTransferir(l) ? `<button class="kmover ktransf" data-transferir="${l.id}">⇄ Transferir atendimento</button>` : ''}
   </div>`;
 }
@@ -1166,7 +1166,7 @@ function telaFunil(modo) {
 function telaFila() {
   if (!FUN.cfg) return '<div class="vazio">Carregando a fila…</div>';
   const c = FUN.cfg, p = FUN.pre || {};
-  const ls = FUN.leads.filter(passaFiltro);
+  const ls = FUN.leads.filter(l => passaFiltro(l) && (gestor() || l.corretor_id === usuario));
   const t = (l) => new Date(l.created_at).getTime();
   const ult = (l) => FUN.ultimo?.[l.id] ? new Date(FUN.ultimo[l.id].quando).getTime() : 0;
   const nivel = (l) => ({ vermelho: 2, amarelo: 1 }[FUN.alerta?.[l.id]?.nivel] || 0);
@@ -1226,11 +1226,11 @@ function telaLead() {
       </div>
       <div class="bloco" id="hist-lead"><h3>Histórico</h3><div class="s" style="color:var(--suave)">Carregando…</div></div>
     </div>
-    <div class="card">
+    ${gestor() || l.corretor_id === usuario ? `<div class="card">
       <h2 style="font-size:16px;margin:0 0 10px">Mover lead</h2>
       ${formMover(l)}
       <button class="principal" data-mover="${l.id}" style="width:100%">Confirmar</button>
-    </div>
+    </div>` : `<div class="card"><div class="s" style="color:var(--suave)">Lead do ${esc(CORRETORES[l.corretor_id] || 'outro corretor')}: só ele (ou o gestor) move este lead.</div></div>`}
   </div>`;
 }
 function statusPossiveis(l) {
@@ -1333,9 +1333,11 @@ function telaNovoLead() {
   return `<div style="margin-bottom:10px"><button data-voltarfunil>← Voltar</button></div>
   <div class="card" style="max-width:560px">
     <h2>Novo lead</h2>
-    <div class="s" style="color:var(--suave);margin-bottom:10px">Entra no Pré-atendimento, em <b>Novo lead</b>, com a SDR.</div>
+    <div class="s" style="color:var(--suave);margin-bottom:10px">Entra no Pré-atendimento, em <b>Novo lead</b>, já com o corretor responsável.</div>
     <div class="grade"><div class="q"><label>WhatsApp *</label><input id="n_tel" inputmode="tel" placeholder="(48) 99999-0000"></div><div class="q"><label>Nome *</label><input id="n_nome"></div></div>
     <div id="ndup"></div>
+    ${gestor() ? `<div class="q"><label>Corretor responsável *</label><select id="n_cor"><option value="">Selecione</option>${CORRETORES_ATIVOS.map(c => `<option value="${c.id}">${esc(c.nome)}${eSdr(c.id) ? ' (SDR)' : ''}</option>`).join('')}</select></div>`
+      : `<div class="q"><label>Corretor responsável</label><div>${esc(CORRETORES[usuario] || 'Você')}</div></div>`}
     <div class="grade"><div class="q"><label>Origem</label><select id="n_origem"><option>Prospecção ativa</option><option>Indicação</option><option>Placa</option><option>Instagram do corretor</option><option>Cliente antigo</option><option>Outro</option></select></div><div class="q"><label>Código do imóvel (se tiver)</label><input id="n_cod" placeholder="1001"></div></div>
     <div class="q"><label>Observação</label><textarea id="n_obs" rows="2" placeholder="O que o cliente procura"></textarea></div>
     <div class="erro" id="nerro"></div>
@@ -1445,9 +1447,10 @@ document.addEventListener('click', async e => {
     const v = (id) => document.getElementById(id)?.value.trim() || '';
     const er = document.getElementById('nerro');
     if (!v('n_nome') || !v('n_tel')) { er.textContent = 'Informe nome e WhatsApp.'; return; }
+    if (gestor() && !v('n_cor')) { er.textContent = 'Escolha o corretor responsável.'; return; }
     b.disabled = true;
     if (await conferirDuplicado(v('n_tel'))) { b.disabled = false; return; }
-    const { data, error } = await db.rpc('crm_vendas_novo_lead', { p_nome: v('n_nome'), p_telefone: v('n_tel'), p_origem: v('n_origem'), p_codigo_imovel: v('n_cod') || null, p_obs: v('n_obs') || null });
+    const { data, error } = await db.rpc('crm_vendas_novo_lead', { p_nome: v('n_nome'), p_telefone: v('n_tel'), p_origem: v('n_origem'), p_codigo_imovel: v('n_cod') || null, p_obs: v('n_obs') || null, p_corretor: gestor() ? v('n_cor') : null });
     b.disabled = false;
     if (error) { er.textContent = error.message; return; }
     aviso('Lead cadastrado no pré-atendimento, em "Novo lead".');
