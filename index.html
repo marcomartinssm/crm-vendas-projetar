@@ -996,7 +996,8 @@ async function carregarFunil() {
 }
 // ---------- Entrada: contatos do WhatsApp que ainda não viraram lead (SDR e gestor) ----------
 const ENT = { lista: [], recentes: [] };
-const veEntrada = () => !VER && (souAprovador || (FUN.sdrs || []).includes(MEU_CORRETOR));
+// Entrada desligada em 03/11/2026: a SDR cadastra o lead à mão em "+ Novo lead". O código fica para o histórico ("Chegou pela Entrada").
+const veEntrada = () => false;
 const ATENDENTE_ALUGUEL = { central: 'Milene', ALUGUELARA: 'Thainara' };
 const ORIGENS_ENTRADA = ['WhatsApp', 'Meta Ads', 'Placa', 'Site', 'Instagram Imobiliária', 'Instagram Corretor', 'Indicação', 'Grupo Zap', 'Construtora Carlessi', 'Anúncio Corretor', 'Plantão Imobiliária', 'Outro'];
 async function carregarEntrada() {
@@ -1154,7 +1155,7 @@ function telaFunil(modo) {
       html += `<div class="kgrp"><div class="khead"><span>Visita</span><span style="color:var(--suave)">${n}</span></div><div class="sub">${col(fv)}${fn ? col(fn) : ''}</div></div>`;
     } else html += col(f);
   }
-  const fim = pre ? `<span class="s" style="margin-left:auto;color:var(--suave)">${FUN.sdrs.length ? 'Pré-atendimento do SDR' : 'Ainda sem SDR: cada corretor faz o pré-atendimento dos próprios leads'}</span>`
+  const fim = pre ? `<span class="s" style="margin-left:auto;color:var(--suave)">${FUN.sdrs.length ? 'Pré-atendimento do SDR' : 'Ainda sem SDR: cada corretor faz o pré-atendimento dos próprios leads'}</span><button class="principal" data-novolead>+ Novo lead</button>`
     : nut ? '<span class="s" style="margin-left:auto;color:var(--suave)">O retorno vence N dias depois que o lead entra na coluna · Hibernado não tem data</span>'
     : '<button class="principal" data-novolead style="margin-left:auto">+ Novo lead</button>';
   return `${barraFiltros(funilId, nut ? 'Só vencidos' : 'Só atrasados', atrasado, fim)}
@@ -1329,13 +1330,13 @@ async function historicoLead(id) {
     <div style="color:var(--suave);font-size:12px">${new Date(m.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</div></div>`).join('') || '<div style="color:var(--suave);font-size:14px">Nenhuma movimentação registrada ainda. As mudanças de etapa feitas a partir de agora aparecem aqui.</div>');
 }
 function telaNovoLead() {
-  const corrs = Object.entries(CORRETORES).sort((a, b) => a[1].localeCompare(b[1]));
-  return `<div style="margin-bottom:10px"><button data-voltarfunil>← Voltar para o funil</button></div>
+  return `<div style="margin-bottom:10px"><button data-voltarfunil>← Voltar</button></div>
   <div class="card" style="max-width:560px">
     <h2>Novo lead</h2>
-    <div class="grade"><div class="q"><label>Nome *</label><input id="n_nome"></div><div class="q"><label>WhatsApp *</label><input id="n_tel" inputmode="tel" placeholder="(48) 99999-0000"></div></div>
+    <div class="s" style="color:var(--suave);margin-bottom:10px">Entra no Pré-atendimento, em <b>Novo lead</b>, com a SDR.</div>
+    <div class="grade"><div class="q"><label>WhatsApp *</label><input id="n_tel" inputmode="tel" placeholder="(48) 99999-0000"></div><div class="q"><label>Nome *</label><input id="n_nome"></div></div>
+    <div id="ndup"></div>
     <div class="grade"><div class="q"><label>Origem</label><select id="n_origem"><option>Prospecção ativa</option><option>Indicação</option><option>Placa</option><option>Instagram do corretor</option><option>Cliente antigo</option><option>Outro</option></select></div><div class="q"><label>Código do imóvel (se tiver)</label><input id="n_cod" placeholder="1001"></div></div>
-    ${gestor() ? `<div class="q"><label>Corretor responsável *</label><select id="n_cor"><option value="">Selecione</option>${corrs.map(([id, n]) => `<option value="${id}">${esc(n)}</option>`).join('')}</select></div>` : ''}
     <div class="q"><label>Observação</label><textarea id="n_obs" rows="2" placeholder="O que o cliente procura"></textarea></div>
     <div class="erro" id="nerro"></div>
     <button class="principal" data-salvarlead>Salvar lead</button>
@@ -1355,7 +1356,30 @@ document.addEventListener('change', e => {
     document.getElementById('mdest').innerHTML = s ? `Vai para <span class="selo ${['perdido', 'descartado', 'noshow_corretor'].includes(s.tipo) ? 'vermelho' : s.tipo === 'venda' ? 'verde' : 'azul'}">${esc(faseNome(s.fase_id))}</span>${extraFunil}${s.tipo === 'noshow_corretor' ? ' <span class="selo vermelho">−50 pts e 1 semana sem leads do SDR</span>' : ''}` : '';
   }
 });
+// Novo lead: ao digitar o WhatsApp, confere se o telefone já é lead (de qualquer corretor) e mostra o histórico no lugar de cadastrar.
+let dupTimer = null, dupTel = '';
+async function conferirDuplicado(tel) {
+  const box = document.getElementById('ndup'), bt = document.querySelector('[data-salvarlead]');
+  const dig = String(tel || '').replace(/\D/g, '');
+  dupTel = dig;
+  if (dig.length < 8) { if (box) box.innerHTML = ''; if (bt) bt.disabled = false; return false; }
+  const { data: d } = await db.rpc('crm_vendas_lead_existente', { p_tel: tel });
+  if (dupTel !== dig || !document.getElementById('ndup')) return !!d;
+  if (bt) bt.disabled = !!d;
+  if (!d) { box.innerHTML = ''; return false; }
+  const quando = (q) => new Date(q).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  const hist = (d.historico || []).map(h => `<div class="hist"><b>${esc(h.titulo || '')}${h.tipo === 'interacao' ? ' <span class="selo">CRM Leads</span>' : ''}</b>
+    <div style="color:var(--suave)">${[h.status ? `Status: "${esc(h.status)}"` : '', h.contato ? esc(h.contato) : '', h.texto ? esc(h.texto) : '', h.corretor ? esc(h.corretor) : ''].filter(Boolean).join(' · ')}</div>
+    <div style="color:var(--suave);font-size:12px">${quando(h.quando)}</div></div>`).join('');
+  box.innerHTML = `<div class="aviso" style="background:var(--ambar-claro);color:var(--ambar)"><b>Esse telefone já está cadastrado.</b> Não dá para cadastrar de novo.<br>
+    <b>${esc(d.nome || 'Sem nome')}</b> · ${esc(d.telefone || '')} · ${esc(d.funil || '')} → <b>${esc(d.fase || '')}</b> · com ${esc(d.corretor || 'sem corretor')}<br>
+    <span class="s">Origem: ${esc(d.origem || '—')}${d.campanha ? ' · ' + esc(d.campanha) : ''}${d.codigo_imovel ? ' · Cód. ' + esc(d.codigo_imovel) : ''} · cadastrado em ${quando(d.criado)}${d.outros_cadastros > 0 ? ` · tem mais ${d.outros_cadastros} cadastro(s) com esse telefone` : ''}</span>
+    ${FUN.leads.some(x => x.id === d.id) ? `<div style="margin-top:8px"><button data-lead="${d.id}">Abrir o lead</button></div>` : ''}</div>
+    <div class="card"><h3>Histórico</h3>${hist || '<div class="s" style="color:var(--suave)">Nenhum registro.</div>'}</div>`;
+  return true;
+}
 document.addEventListener('input', e => {
+  if (e.target.id === 'n_tel') { clearTimeout(dupTimer); const t = e.target.value; dupTimer = setTimeout(() => conferirDuplicado(t), 400); }
   if (e.target.id === 'fbusca') { FUN.busca = e.target.value; const pos = e.target.selectionStart; render(); const b = document.getElementById('fbusca'); b.focus(); b.setSelectionRange(pos, pos); }
 });
 document.addEventListener('click', async e => {
@@ -1383,7 +1407,7 @@ document.addEventListener('click', async e => {
   else if (ds.fecharmodal !== undefined) fecharModal();
   else if (ds.lead) { tela = { nome: 'lead', id: ds.lead, de: ['fila', 'pre', 'nut', 'funil'].includes(tela.nome) ? tela.nome : null }; render(); }
   else if (ds.voltarfunil !== undefined) { const l = FUN.leads.find(x => x.id === tela.id); tela = { nome: tela.de || (l ? abaDoLead(l) : 'funil') }; render(); }
-  else if (ds.novolead !== undefined) { tela = { nome: 'novolead' }; render(); }
+  else if (ds.novolead !== undefined) { tela = { nome: 'novolead', de: ['pre', 'fila', 'funil'].includes(tela.nome) ? tela.nome : null }; render(); }
   else if (ds.mover) {
     const st = document.getElementById('mstatus').value, obs = document.getElementById('mobs').value.trim();
     const er = document.getElementById('merro');
@@ -1421,12 +1445,12 @@ document.addEventListener('click', async e => {
     const v = (id) => document.getElementById(id)?.value.trim() || '';
     const er = document.getElementById('nerro');
     if (!v('n_nome') || !v('n_tel')) { er.textContent = 'Informe nome e WhatsApp.'; return; }
-    if (gestor() && !v('n_cor')) { er.textContent = 'Escolha o corretor responsável.'; return; }
     b.disabled = true;
-    const { data, error } = await db.rpc('crm_vendas_novo_lead', { p_nome: v('n_nome'), p_telefone: v('n_tel'), p_origem: v('n_origem'), p_codigo_imovel: v('n_cod') || null, p_obs: v('n_obs') || null, p_corretor: gestor() ? v('n_cor') : (VER || null) });
+    if (await conferirDuplicado(v('n_tel'))) { b.disabled = false; return; }
+    const { data, error } = await db.rpc('crm_vendas_novo_lead', { p_nome: v('n_nome'), p_telefone: v('n_tel'), p_origem: v('n_origem'), p_codigo_imovel: v('n_cod') || null, p_obs: v('n_obs') || null });
     b.disabled = false;
     if (error) { er.textContent = error.message; return; }
-    aviso('Lead cadastrado em "Novo lead".');
+    aviso('Lead cadastrado no pré-atendimento, em "Novo lead".');
     await carregarFunil(); tela = { nome: 'lead', id: data }; render();
   }
 });

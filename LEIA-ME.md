@@ -19,7 +19,8 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 - É o funil "Atendimento" do CRM Leads (tabelas `funis`/`fases`/`leads`). Em 15/10/2026: "Atendimento" virou "Em atendimento", "Visita" virou "Visita realizada", "Agendamento de Visita" virou "Agendamento de visita"; criadas "Novo lead", "Não compareceu", "Perdido", "Descartado". Ids antigos mantidos. Mapa das fases em `crm_vendas_config.funil_vendas`.
 - `crm_vendas_status` — status de cada coluna (o que se escolhe ao mover; `tipo` guia regras: agendamento, visita, noshow_cliente, noshow_corretor, proposta, venda, perdido, descartado).
 - `crm_vendas_movimentos` — cada passagem: de/para, status, observação obrigatória, extras (data da visita, valor, honorário, tipo de venda...), corretor, quem, quando.
-- Funções: `crm_vendas_mover_lead` (valida permissão, observação e campos obrigatórios por tipo) e `crm_vendas_novo_lead` (lead de prospecção entra em "Novo lead").
+- Funções: `crm_vendas_mover_lead` (valida permissão, observação e campos obrigatórios por tipo) e `crm_vendas_novo_lead`.
+- **+ Novo lead** (botão no Pré-atendimento e no Funil de vendas, desde 03/11/2026): o lead entra no **Pré-atendimento, fase "Novo Lead"**, e o gatilho passa para a SDR ativa. Não cadastra telefone repetido (8 últimos dígitos, qualquer corretor): ao digitar o WhatsApp a tela chama `crm_vendas_lead_existente` e mostra dono, funil, fase e o histórico do lead (movimentos + interações do CRM Leads) no lugar de salvar.
 - Leads seguem a regra de acesso do CRM Leads: corretor vê os dele, admin vê todos.
 
 ## Pré-atendimento (SDR) e transferência
@@ -42,7 +43,9 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 - **Diário:** seg–sex 18h30 (o dia de hoje). **Semanal:** sábado 9h (sábado a sexta). **Mensal:** dia 1 às 8h05 (mês anterior). pg_cron `crm-vendas-relatorio-*` → `crm_vendas_chamar_relatorio(tipo)`.
 - Cada envio fica em `crm_vendas_relatorios` (não manda duas vezes o mesmo período).
 
-## Entrada (aba "Entrada", só SDR e gestor) — igual à Entrada do CRM Aluguel
+## Entrada (DESLIGADA em 03/11/2026)
+- O Marco achou que não ficou bom para a SDR: ela cadastra à mão em "+ Novo lead". Aba escondida (`veEntrada` = false), `entrada_instancias` vazio (a função ignora o venda-ara) e gatilho `zz_crm_vendas_entrada_do_aluguel` desativado. Tabela e funções ficaram; para religar, desfazer esses três pontos.
+- Como funcionava:
 - `crm_vendas_entrada`: contatos do WhatsApp que ainda não viraram lead. Duas fontes:
   1. **Contatos marcados "Vendas" na Entrada do CRM Aluguel** (Milene/central e Thainara/ALUGUELARA) — gatilho `zz_crm_vendas_entrada_do_aluguel` em `crm_aluguel_contatos`. Em 27/10/2026 entraram os 9 dos últimos 30 dias.
   2. **Número de vendas na Evolution**: edge function `crm-vendas-entrada` (código em `supabase/functions/crm-vendas-entrada/index.ts`, verify_jwt desligado, `?token=` = o mesmo dos relatórios). Só atende instâncias listadas em `crm_vendas_relatorio_config.entrada_instancias` = **venda-ara** (o único número de vendas, decisão do Marco em 27/10/2026). Ligar: incluir o nome lá e `POST ...crm-vendas-entrada?token=...&acao=ligar_webhook&instancia=NOME` (ver antes `acao=webhook_atual` — a Evolution aceita **um** webhook por número). `acao=instancias` lista os números e para onde mandam hoje.
