@@ -119,6 +119,13 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 ## Descrição do anúncio: o que a IA devolve (01/11/2026)
 - Além de título, meta, H1 e seções: `destaques` (lista curta), `url_slug` (endereço sugerido da página) e `schema` (etiqueta para colar no site). Regras na tarefa `crm-vendas-descricoes-imoveis`: abre com os trunfos, frases prontas proibidas, nunca rua/número/CEP em texto público. O Google não tem resultado especial para imóvel à venda (galeria conferida em 01/11/2026): o Schema só ajuda a ler a página.
 
+## O que tem perto (Google Maps, 04/11/2026)
+- Etapa 8 da ficha. O botão "Buscar no Google Maps" chama a função `crm-vendas-proximidades` (chave no secret `GOOGLE_MAPS_KEY`, projeto Google Cloud `crm-vendas-513712`, conta em avaliação gratuita). São 13 buscas por imóvel: 1 do endereço + mercado, farmácia, posto, padaria, banco, escolas (pública e particular saem da mesma busca, separadas pelo nome), creche, posto de saúde (por texto) + hospital, praça, academia e igreja. Raio de 3 km; fechados de vez ficam de fora.
+- Limite de 150 buscas por dia no banco (`crm_vendas_google_reservar`, tabela `crm_vendas_google_uso`), porque a cota do Google não pôde ser editada. Isso dá cerca de 11 imóveis por dia.
+- O corretor confere cada lugar (Ainda existe / Não existe → usar o próximo, escrever o que tem lá agora ou não citar). "Enviar para aprovação" só passa com tudo conferido e com o endereço igual ao da busca. No link do celular a etapa é opcional.
+- Pontos fixos de Araranguá (Calçadão, Morro dos Conventos, Rodoviária, BR-101, UFSC/IFSC) têm coordenadas fixas do OpenStreetMap no código; só a distância é calculada.
+- Fica guardado só `proximidades` (o que foi confirmado). Ao enviar, a lista do Google e as coordenadas são apagadas (regra do Google: coordenadas no máximo 30 dias); rascunho com busca de mais de 25 dias pede nova busca. A IA da descrição recebe `proximidades` e não recebe `perto_busca`/`perto_conf`.
+
 ## Endereço publicado
 - https://marcomartinssm.github.io/crm-vendas-projetar/ (link direto de cadastro de imóvel: `.../#novo`)
 - Repositório público `marcomartinssm/crm-vendas-projetar` (GitHub Pages, branch main, raiz). Para atualizar: commit + push na main; o site atualiza em ~1 minuto.
