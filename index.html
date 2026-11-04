@@ -843,7 +843,7 @@ function telaDetalhe() {
           <div style="color:var(--suave);font-size:14px">${esc(im.end)}, ${esc(im.cidade)}${im.uf ? '/' + esc(im.uf) : ''}${im.cep ? ' · CEP ' + esc(im.cep) : ''} · ${codigoTxt(im)}${im.codigo_imoview ? ' · Imoview ' + esc(im.codigo_imoview) : ''} · ${esc(CORRETORES[im.corretor] || '')}</div>
           <div class="selos" style="margin-top:6px"><span class="selo ${st.c}">${st.t}</span>${at ? `<span class="selo ${at.c}">${at.t}</span>` : ''}</div></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            ${podeEditar ? `<button class="principal" data-editar="${im.id}">${im.status === 'devolvido' ? 'Ajustar e reenviar' : im.status === 'revisao' ? 'Revisar e enviar ao gestor' : 'Continuar cadastro'}</button>` : ''}
+            ${podeEditar ? `<button class="principal" data-editar="${im.id}">${im.status === 'devolvido' ? 'Ajustar e reenviar' : im.status === 'revisao' ? '✏️ Editar ficha' : '✏️ Continuar cadastro'}</button>` : ''}
             ${im.status === 'ativo' && (gestor() || im.corretor === usuario) ? `<button data-atualizei="${im.id}">Registrar atualização com o proprietário</button>` : ''}
           </div>
         </div>
