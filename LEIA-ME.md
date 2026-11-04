@@ -58,6 +58,13 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 - Quem tem contato registrado hoje sai da fila (menos quem tem aviso de atraso). Tudo calculado na tela (`telaFila` em `index.html`).
 - Prazos por tentativa de contato e rapidez com lead novo: ficam para depois (decisão do Marco, 26/10/2026).
 
+## Agenda de contatos do SDR (04/11/2026)
+- Só para leads de SDR (`sdrs`), decisão do Marco: a janela "Mover lead" ganha **Próximo contato** (data e hora livres, sem prazo fixo; atalhos Amanhã / 2 dias / 1 semana / 1 mês só preenchem o campo) + "o que fazer" opcional. Não é obrigatório. Some em venda, perdido e descartado.
+- Vai em `extras.proximo_contato` / `extras.proximo_nota` do movimento. Gatilho `crm_vendas_tarefa_do_movimento` (AFTER INSERT em `crm_vendas_movimentos`): **qualquer movimento do lead encerra a tarefa aberta** (`feito_em`, `feito_tipo`; transferência também) e, se veio próximo contato, cria outra em `crm_vendas_tarefas`. Tabela só leitura para a tela (RLS: gestor ou dono).
+- Fila do dia: ⏰ agendados atrasados → 📅 agendados para hoje (por horário) no topo; quem tem contato agendado **sai das outras listas**; 🗓️ próximos agendados no fim. Cartão e ficha mostram "📅 Contato agendado".
+- `crm_vendas_alertas()`: tipo novo **`agenda`** (passou da hora = amarelo; 24 h depois = vermelho). **"Parado" não vale** para lead com tarefa aberta (o combinado com o cliente manda).
+- Painel: quadro "Agenda de contatos (SDR)" via `crm_vendas_agenda_resumo(ini, fim)` (só gestor): agendados, feitos no dia (ou antes), feitos depois, não feitos, abertos de hoje, % de cumprimento.
+
 ## Nutrição (aba "Nutrição")
 - Funil "Nutrição" do CRM Leads (Hibernado, 15 dias … 360 dias). O retorno vence N dias depois que o lead entrou na coluna (`fase_atualizada_em`); Hibernado não tem data.
 - Status `origem = 'nutricao'` em `crm_vendas_status`: "Retornar em N dias" (um por coluna). Aparecem para leads do pré, da nutrição, da SDR e para o gestor.

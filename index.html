@@ -1138,8 +1138,12 @@ async function carregarFunil() {
   // Avisos de prazo (mesma regra que vai para a pontuação): fica o mais grave de cada lead.
   const { data: al } = await db.rpc('crm_vendas_alertas');
   FUN.alerta = {};
-  const peso = (a) => (a.nivel === 'vermelho' ? 10 : 0) + ({ transferencia: 5, retorno: 4, feedback: 3, followup: 2, parado: 1 }[a.tipo] || 0);
+  const peso = (a) => (a.nivel === 'vermelho' ? 10 : 0) + ({ transferencia: 5, retorno: 4, agenda: 4, feedback: 3, followup: 2, parado: 1 }[a.tipo] || 0);
   (al || []).forEach(a => { const atual = FUN.alerta[a.lead_id]; if (!atual || peso(a) > peso(atual)) FUN.alerta[a.lead_id] = a; });
+  // Agenda do SDR: próximo contato marcado em cada lead (o mais cedo, se houver mais de um).
+  const { data: tfs } = await db.from('crm_vendas_tarefas').select('lead_id, quando, nota').is('feito_em', null).order('quando');
+  FUN.tarefa = {};
+  (tfs || []).forEach(t => { if (!FUN.tarefa[t.lead_id]) FUN.tarefa[t.lead_id] = t; });
   const ids = FUN.leads.map(l => l.id);
   FUN.ultimo = {}; FUN.recad = {};
   const marca = (id, quando, tipo) => { const u = FUN.ultimo[id]; if (!u || new Date(quando) > new Date(u.quando)) FUN.ultimo[id] = { quando, tipo }; };
@@ -1239,6 +1243,7 @@ function alertaTxt(a) {
   if (a.tipo === 'feedback') return a.nivel === 'vermelho' ? `Atrasado: feedback da visita (${d >= 1 ? d + 'd' : h + 'h'})` : `Visita passou: registre o resultado (vence em ${Math.max(1, 24 - h)}h)`;
   if (a.tipo === 'followup') return a.nivel === 'vermelho' ? `Atrasado: follow-up da visita (${h}h)` : `Follow-up vence em ${Math.max(1, 36 - h)}h`;
   if (a.tipo === 'transferencia') return a.nivel === 'vermelho' ? `Atrasado: recebido por transferência há ${h}h sem contato` : 'Recebido por transferência: faça o 1º contato';
+  if (a.tipo === 'agenda') return `Atrasado: contato agendado para ${agendaTxt(a.referencia)}`;
   return a.nivel === 'vermelho' ? `Atrasado: sem contato há ${d} dias` : `Sem contato há ${d} dias: faça contato até amanhã`;
 }
 const CONTATOS = ['WhatsApp', 'Ligação', 'Visita', 'E-mail', 'Instagram', 'Presencial'];
@@ -1267,6 +1272,15 @@ function retornoNut(l) {
 }
 const hojeBR = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
 const diaBR = (ts) => new Date(ts).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+// "hoje 10:00", "amanhã 09:30", "seg 10/11 14:00"
+function agendaTxt(ts) {
+  const d = new Date(ts), hora = d.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+  const dia = diaBR(d), hoje = hojeBR(), amanha = diaBR(Date.now() + 86400000), ontem = diaBR(Date.now() - 86400000);
+  if (dia === hoje) return 'hoje ' + hora;
+  if (dia === amanha) return 'amanhã ' + hora;
+  if (dia === ontem) return 'ontem ' + hora;
+  return d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'short', day: '2-digit', month: '2-digit' }).replace('.', '') + ' ' + hora;
+}
 const contatadoHoje = (id) => { const u = (FUN.ultimo || {})[id]; return !!u && diaBR(u.quando) === hojeBR(); };
 // Voltou a se cadastrar nos últimos 30 dias e ninguém falou com ele depois disso.
 const recadPendente = (id) => { const r = FUN.recad?.[id]; if (!r || Date.now() - new Date(r) > 30 * 86400000) return null; const u = FUN.ultimo?.[id]; return !u || new Date(r) > new Date(u.quando) ? r : null; };
@@ -1283,6 +1297,7 @@ function cardLead(l, comEtapa) {
     ${at ? `<div class="kaviso">${esc(at)}</div>` : ''}
     ${rc ? `<div class="kaviso" style="color:var(--azul)">🔁 Voltou a se cadastrar em ${dm(rc)}</div>` : ''}
     ${rn ? `<div class="kaviso">${rn.vencido ? `💤 Retorno venceu em ${dm(rn.quando)}` : `<span style="color:var(--suave)">💤 Retorno em ${dm(rn.quando)}</span>`}</div>` : ''}
+    ${FUN.tarefa?.[l.id] && new Date(FUN.tarefa[l.id].quando) > new Date() ? `<div class="kaviso" style="color:var(--azul)">📅 Contato agendado: ${esc(agendaTxt(FUN.tarefa[l.id].quando))}${FUN.tarefa[l.id].nota ? ' · ' + esc(FUN.tarefa[l.id].nota) : ''}</div>` : ''}
     ${comEtapa ? `<div class="s" style="color:var(--suave);margin-bottom:4px">${esc(faseNome(l.fase_id))}</div>` : ''}
     <div class="ktopo"><span class="kav">${esc(iniciais(l.nome))}</span><b>${esc(l.nome || 'Sem nome')}</b></div>
     ${l.telefone ? `<div class="ktel">☏ ${esc(l.telefone)} <button class="kcopia" data-copiar="${esc(l.telefone)}" title="Copiar telefone" aria-label="Copiar telefone">⧉</button></div>` : ''}
@@ -1334,22 +1349,35 @@ function telaFila() {
   const nivel = (l) => ({ vermelho: 2, amarelo: 1 }[FUN.alerta?.[l.id]?.nivel] || 0);
   const pendente = (l) => !contatadoHoje(l.id) || nivel(l) > 0;
   const voltou = ls.filter(l => recadPendente(l.id));
-  const novos = ls.filter(l => l.fase_id === p.novo && pendente(l) && !recadPendente(l.id)).sort((a, b) => t(b) - t(a));
+  // Agenda do SDR: quem tem contato marcado aparece só na agenda (no dia e hora combinados), não nas listas abaixo.
+  const tf = (l) => FUN.tarefa?.[l.id], tq = (l) => new Date(tf(l).quando).getTime(), agora = Date.now(), hoje = hojeBR();
+  const comAgenda = ls.filter(l => tf(l) && !recadPendente(l.id)).sort((a, b) => tq(a) - tq(b));
+  const agAtras = comAgenda.filter(l => tq(l) < agora);
+  const agHoje = comAgenda.filter(l => tq(l) >= agora && diaBR(tq(l)) === hoje);
+  const agProx = comAgenda.filter(l => diaBR(tq(l)) > hoje);
+  const livre = (l) => !recadPendente(l.id) && !tf(l);
+  const novos = ls.filter(l => l.fase_id === p.novo && pendente(l) && livre(l)).sort((a, b) => t(b) - t(a));
   const contatos = [p.c1, p.c2, p.c3, p.c4, p.c5];
-  const retornos = ls.filter(l => contatos.includes(l.fase_id) && pendente(l) && !recadPendente(l.id)).sort((a, b) => nivel(b) - nivel(a) || ult(a) - ult(b));
+  const retornos = ls.filter(l => contatos.includes(l.fase_id) && pendente(l) && livre(l)).sort((a, b) => nivel(b) - nivel(a) || ult(a) - ult(b));
   const abertos = [c.novo, c.atendimento, c.agendamento, c.visita, c.noshow, c.proposta];
-  const atend = ls.filter(l => abertos.includes(l.fase_id) && pendente(l) && !recadPendente(l.id)).sort((a, b) => nivel(b) - nivel(a) || ult(a) - ult(b));
-  const nutri = ls.filter(l => retornoNut(l)?.vencido && !recadPendente(l.id)).sort((a, b) => retornoNut(a).quando - retornoNut(b).quando);
+  const atend = ls.filter(l => abertos.includes(l.fase_id) && pendente(l) && livre(l)).sort((a, b) => nivel(b) - nivel(a) || ult(a) - ult(b));
+  const nutri = ls.filter(l => retornoNut(l)?.vencido && livre(l)).sort((a, b) => retornoNut(a).quando - retornoNut(b).quando);
   const sec = (titulo, dica, lista) => `<div class="fsec"><div class="khead"><span>${titulo}</span><span style="color:var(--suave)">${lista.length}</span></div>
     ${dica ? `<div class="dica">${dica}</div>` : ''}
     ${lista.length ? `<div class="fgrid">${lista.slice(0, 60).map(l => cardLead(l, true)).join('')}</div>${lista.length > 60 ? `<div class="fmais">+${lista.length - 60} leads (use a busca ou o filtro para achar)</div>` : ''}` : '<div class="s" style="color:var(--suave)">Nada aqui hoje.</div>'}</div>`;
-  const total = voltou.length + novos.length + retornos.length + atend.length + nutri.length;
+  const total = voltou.length + agAtras.length + agHoje.length + novos.length + retornos.length + atend.length + nutri.length;
+  const proxDias = agProx.length ? `<div class="fsec"><div class="khead"><span>🗓️ Próximos contatos agendados</span><span style="color:var(--suave)">${agProx.length}</span></div>
+    <div class="card" style="padding:6px 12px">${agProx.slice(0, 40).map(l => `<div class="linha" data-lead="${l.id}" style="cursor:pointer"><span>${esc(agendaTxt(tf(l).quando))}</span><span><b>${esc(l.nome || 'Sem nome')}</b>${tf(l).nota ? ' · ' + esc(tf(l).nota) : ''}${gestor() ? ' · ' + esc(CORRETORES[l.corretor_id] || '') : ''}</span></div>`).join('')}
+    ${agProx.length > 40 ? `<div class="fmais">+${agProx.length - 40} agendados</div>` : ''}</div></div>` : '';
   return `${barraFiltros(null, '', null, `<span class="s" style="margin-left:auto;color:var(--suave)">${total} lead${total === 1 ? '' : 's'} para hoje · quem tem contato registrado hoje sai da fila</span>`)}
     ${voltou.length ? sec('🔁 Voltaram a se cadastrar', 'Lead que se cadastrou de novo e ainda não teve contato depois disso.', voltou) : ''}
+    ${agAtras.length ? sec('⏰ Contatos agendados atrasados', 'O dia e a hora combinados já passaram: o mais antigo primeiro.', agAtras) : ''}
+    ${comAgenda.length ? sec('📅 Contatos agendados para hoje', 'Na ordem do horário.', agHoje) : ''}
     ${sec('🆕 Novos leads · Pré-atendimento', 'Os mais recentes primeiro: fale enquanto o interesse está quente.', novos)}
     ${sec('📞 Retornos · Pré-atendimento (1º ao 5º contato)', 'Atrasados primeiro; depois quem está há mais tempo sem contato.', retornos)}
     ${sec('🤝 Em atendimento · Funil de vendas', 'Atrasados primeiro (transferência, visita, follow-up); depois quem está há mais tempo sem contato.', atend)}
-    ${sec('💤 Nutrição · retorno vencido', 'O retorno mais antigo primeiro.', nutri)}`;
+    ${sec('💤 Nutrição · retorno vencido', 'O retorno mais antigo primeiro.', nutri)}
+    ${proxDias}`;
 }
 // Busca e filtro de corretor (gestor), usados no funil e na fila do dia.
 function passaFiltro(l) {
@@ -1385,6 +1413,7 @@ function telaLead() {
         <div class="linha"><span>Imóvel</span><span>${l.codigo_imovel ? 'Cód. ' + esc(l.codigo_imovel) : '—'}</span></div>
         ${l.valor_negociacao ? `<div class="linha"><span>Valor em negociação</span><span>${brl(l.valor_negociacao)}</span></div>` : ''}
         <div class="linha"><span>Entrou no CRM</span><span>${new Date(l.created_at).toLocaleDateString('pt-BR')}</span></div>
+        ${FUN.tarefa?.[l.id] ? `<div class="linha"><span>Próximo contato</span><span>${esc(agendaTxt(FUN.tarefa[l.id].quando))}${FUN.tarefa[l.id].nota ? ' · ' + esc(FUN.tarefa[l.id].nota) : ''}</span></div>` : ''}
       </div>
       <div class="bloco" id="hist-lead"><h3>Histórico</h3><div class="s" style="color:var(--suave)">Carregando…</div></div>
     </div>
@@ -1429,8 +1458,23 @@ function formMover(l) {
     <div id="mextra"></div>
     <div class="q"><label for="mcontato">Contato feito *</label><select id="mcontato"><option value="">Como falou com o cliente?</option>${CONTATOS.map(c => `<option>${c}</option>`).join('')}</select></div>
     <div class="q"><label for="mobs" id="mobslabel">Observação</label><textarea id="mobs" rows="3" placeholder="Resumo do atendimento"></textarea></div>
+    ${eSdr(l.corretor_id) ? blocoProximo() : ''}
     <div class="erro" id="merro"></div>`;
 }
+// Agenda do SDR: data e hora livres; os atalhos só preenchem o campo (9h, se não houver hora melhor).
+function blocoProximo() {
+  return `<div class="q" id="mproxbox"><label for="mprox">Próximo contato (data e hora)</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${[['Amanhã', 1], ['Em 2 dias', 2], ['Em 1 semana', 7], ['Em 1 mês', 30]].map(([t, n]) => `<button type="button" data-proxdias="${n}">${t}</button>`).join('')}</div>
+      <input type="datetime-local" id="mprox">
+      <input id="mproxnota" placeholder="O que fazer nesse contato (opcional)" style="margin-top:6px">
+      <div class="dica">Fica na sua Fila do dia nesse dia e horário. Ao registrar o próximo contato com o cliente, sai da agenda sozinho.</div></div>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-proxdias]'); if (!b) return;
+  const d = new Date(Date.now() + +b.dataset.proxdias * 86400000); d.setHours(9, 0, 0, 0);
+  const p = (n) => String(n).padStart(2, '0');
+  document.getElementById('mprox').value = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T09:00`;
+});
 function abrirModalMover(id) {
   const l = FUN.leads.find(x => x.id === id); if (!l) return;
   const m = document.getElementById('modal');
@@ -1512,6 +1556,7 @@ document.addEventListener('change', e => {
     const s = FUN.status.find(x => String(x.id) === e.target.value);
     document.getElementById('mextra').innerHTML = s ? extrasMover(s.tipo) : '';
     document.getElementById('merro').textContent = '';
+    const px = document.getElementById('mproxbox'); if (px) px.hidden = !!s && ['venda', 'perdido', 'descartado'].includes(s.tipo);
     const lab = document.getElementById('mobslabel');
     if (lab) lab.textContent = s && s.tipo === 'contato' ? 'Observação * (o que foi conversado)' : s && ['perdido', 'descartado'].includes(s.tipo) ? 'Observação * (o que aconteceu)' : 'Observação (opcional)';
     if (s && s.tipo === 'contato') { document.getElementById('mdest').innerHTML = 'O lead <b>continua na mesma etapa</b>; só registra o contato.'; return; }
@@ -1592,6 +1637,7 @@ document.addEventListener('click', async e => {
     if (v('x_hon')) ex.honorario = v('x_hon');
     if (v('x_div')) ex.dividida = v('x_div') === 'sim';
     if (ex.dividida) { if (!v('x_parceiro')) { er.textContent = 'Escolha com qual corretor a venda foi dividida.'; return; } ex.parceiro = v('x_parceiro'); }
+    if (v('mprox') && !document.getElementById('mproxbox')?.hidden) { ex.proximo_contato = new Date(v('mprox')).toISOString(); if (v('mproxnota').trim()) ex.proximo_nota = v('mproxnota').trim(); }
     b.disabled = true;
     const { error } = await db.rpc('crm_vendas_mover_lead', { p_lead: ds.mover, p_status: +st, p_obs: obs, p_extras: ex });
     b.disabled = false;
@@ -1914,12 +1960,13 @@ function periodoPainel() {
 }
 async function carregarPainel() {
   const [ini, fim] = periodoPainel();
-  const [{ data, error }, org] = await Promise.all([
+  const [{ data, error }, org, ag] = await Promise.all([
     db.rpc('crm_vendas_painel', { p_ini: ini, p_fim: fim }),
     db.rpc('crm_vendas_painel_origens', { p_ini: ini, p_fim: fim }),
+    db.rpc('crm_vendas_agenda_resumo', { p_ini: ini, p_fim: new Date(hojeBR() + 'T23:59:59-03:00').toISOString() }), // agenda: até o fim de hoje
   ]);
   if (error) { aviso('Não foi possível carregar o painel.', true); return; }
-  PNL.dados = data; PNL.origens = org.data || null; if (tela.nome === 'painel') render();
+  PNL.dados = data; PNL.origens = org.data || null; PNL.agenda = ag.data || []; if (tela.nome === 'painel') render();
 }
 const pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '—';
 function telaPainel() {
@@ -1941,8 +1988,14 @@ function telaPainel() {
   <div class="kpis">
     ${kpi('Lead → visita', pct(m.visitas_agendadas, m.novos_leads))}${kpi('Comparecimento', pct(m.visitas_realizadas, m.visitas_realizadas + m.noshow_cliente + m.noshow_corretor))}
     ${kpi('Visita → proposta', pct(m.propostas, m.visitas_realizadas))}${kpi('Visita → venda', pct(m.vendas, m.visitas_realizadas), 'meta 10%')}
-    ${kpi('Atrasados agora', `<span style="color:${totAtr ? 'var(--vermelho)' : 'inherit'}">${totAtr}</span>`, [['retorno', 'lead novo 24 h'], ['feedback', 'feedback'], ['followup', 'follow-up'], ['parado', 'parados 5+ dias']].filter(([k]) => at[k]).map(([k, t]) => `${at[k]} ${t}`).join(' · '))}
+    ${kpi('Atrasados agora', `<span style="color:${totAtr ? 'var(--vermelho)' : 'inherit'}">${totAtr}</span>`, [['retorno', 'lead novo 24 h'], ['agenda', 'contato agendado'], ['feedback', 'feedback'], ['followup', 'follow-up'], ['parado', 'parados 5+ dias']].filter(([k]) => at[k]).map(([k, t]) => `${at[k]} ${t}`).join(' · '))}
   </div>
+  ${(PNL.agenda || []).length ? `<div class="card" style="margin-bottom:12px;overflow-x:auto"><h2 style="font-size:16px;margin:0 0 4px">Agenda de contatos (SDR)</h2>
+    <div class="dica" style="margin-bottom:8px">Contatos que estavam marcados para o período. "No dia" = feito no dia combinado ou antes; "depois" = feito com atraso; "não feito" = o dia passou sem contato.</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:560px"><thead><tr style="color:var(--suave);text-align:left">
+      ${['Quem', 'Agendados', 'Feitos no dia', 'Feitos depois', 'Não feitos', 'Abertos de hoje', 'Cumprimento'].map(h => `<th style="padding:6px 4px;font-weight:600">${h}</th>`).join('')}</tr></thead><tbody>
+      ${PNL.agenda.map(a => { const base = a.agendados - a.transferidos - a.pendentes; return `<tr style="border-top:1px solid var(--borda)"><td style="padding:7px 4px;font-weight:600">${esc(CORRETORES[a.corretor_id] || 'Sem nome')}</td><td>${a.agendados}</td><td style="color:var(--verde)">${a.no_prazo}</td><td style="color:${a.atrasados ? 'var(--ambar)' : 'inherit'}">${a.atrasados}</td><td style="color:${a.nao_feitos ? 'var(--vermelho)' : 'inherit'}">${a.nao_feitos}</td><td>${a.pendentes}</td><td><b>${pct(a.no_prazo, base)}</b></td></tr>`; }).join('')}
+    </tbody></table></div>` : ''}
   <div class="card" style="margin-bottom:12px;overflow-x:auto"><h2 style="font-size:16px;margin:0 0 8px">Corretores no período</h2>
     <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:820px"><thead><tr style="color:var(--suave);text-align:left">
       ${['Corretor', 'Leads abertos', 'Atrasados', 'Contatos', 'Visitas', 'Propostas', 'Vendas', 'VGV', 'Faltas', 'Atividades', 'Agenc.', 'Carteira', 'Pontos'].map(h => `<th style="padding:6px 4px;font-weight:600">${h}</th>`).join('')}</tr></thead><tbody>
