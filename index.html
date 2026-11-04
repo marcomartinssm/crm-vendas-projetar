@@ -1297,7 +1297,7 @@ function cardLead(l, comEtapa) {
     ${at ? `<div class="kaviso">${esc(at)}</div>` : ''}
     ${rc ? `<div class="kaviso" style="color:var(--azul)">🔁 Voltou a se cadastrar em ${dm(rc)}</div>` : ''}
     ${rn ? `<div class="kaviso">${rn.vencido ? `💤 Retorno venceu em ${dm(rn.quando)}` : `<span style="color:var(--suave)">💤 Retorno em ${dm(rn.quando)}</span>`}</div>` : ''}
-    ${FUN.tarefa?.[l.id] && new Date(FUN.tarefa[l.id].quando) > new Date() ? `<div class="kaviso" style="color:var(--azul)">📅 Contato agendado: ${esc(agendaTxt(FUN.tarefa[l.id].quando))}${FUN.tarefa[l.id].nota ? ' · ' + esc(FUN.tarefa[l.id].nota) : ''}</div>` : ''}
+    ${FUN.tarefa?.[l.id] && (new Date(FUN.tarefa[l.id].quando) > new Date() || a?.tipo !== 'agenda') ? `<div class="kaviso" style="color:var(--azul)">📅 Contato agendado:${esc(agendaTxt(FUN.tarefa[l.id].quando))}${FUN.tarefa[l.id].nota ? ' · ' + esc(FUN.tarefa[l.id].nota) : ''}</div>` : ''}
     ${comEtapa ? `<div class="s" style="color:var(--suave);margin-bottom:4px">${esc(faseNome(l.fase_id))}</div>` : ''}
     <div class="ktopo"><span class="kav">${esc(iniciais(l.nome))}</span><b>${esc(l.nome || 'Sem nome')}</b></div>
     ${l.telefone ? `<div class="ktel">☏ ${esc(l.telefone)} <button class="kcopia" data-copiar="${esc(l.telefone)}" title="Copiar telefone" aria-label="Copiar telefone">⧉</button></div>` : ''}
