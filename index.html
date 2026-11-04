@@ -1051,6 +1051,7 @@ document.addEventListener('click', e => {
     }
     b.disabled = true;
     pertoLimparParaEnviar();
+    if (F.descricao_seo) F.pedir_descricao = true; // a ficha mudou desde a última descrição: a IA escreve outra com os dados novos
     gravarF('aguardando').then(ok => { b.disabled = false; if (ok) { tela = modoLink ? { nome: 'enviado', id: F.id } : { nome: 'det', id: F.id }; render(); } });
   }
   else if (ds.aprovar || ds.devolver) {
