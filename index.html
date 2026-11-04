@@ -116,7 +116,10 @@
   .bloco h3 { font-size: 14px; margin: 0 0 6px; color: var(--suave); font-weight: 600; }
   .aviso { border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 12px; }
 
-  .kanban { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; align-items: flex-start; }
+  /* O quadro rola por dentro e cabe na tela: a barra de rolagem lateral fica sempre visível embaixo (altura em ajustarKanban) */
+  .kanban { display: flex; gap: 8px; overflow: auto; padding-bottom: 8px; align-items: flex-start; }
+  .kanban .khead { position: sticky; top: 0; z-index: 1; background: inherit; padding: 6px 2px; margin: -6px 0 2px; }
+  .kgrp > .khead { background: var(--card); }
   .kcol { background: var(--card); border: 1px solid var(--borda); border-radius: 12px; padding: 8px; flex: 0 0 210px; }
   .kgrp { background: var(--card); border: 1px solid var(--borda); border-radius: 12px; padding: 8px; flex: 0 0 auto; }
   .kgrp .kcol { border: none; background: var(--fundo); flex-basis: 196px; }
@@ -373,6 +376,7 @@ function render() {
     : ['funil', 'lead', 'novolead'].includes(tela.nome) ? 'funil' : 'lista';
   document.getElementById('abas').innerHTML = abas.map(([k, t]) => `<button data-aba="${k}" class="${atual === k ? 'on' : ''}">${t}</button>`).join('');
   const app = document.getElementById('app');
+  const kAntes = app.querySelector('.kanban'), kPos = kAntes && tela.nome === kTela ? [kAntes.scrollLeft, kAntes.scrollTop] : null;
   if (tela.nome === 'lista') app.innerHTML = telaLista();
   else if (tela.nome === 'aprovacao') app.innerHTML = telaAprovacao();
   else if (tela.nome === 'form') app.innerHTML = telaForm();
@@ -393,7 +397,17 @@ function render() {
   if (tela.nome === 'det') extrasDetalhe(tela.id);
   if (tela.nome === 'lead') historicoLead(tela.id);
   window.scrollTo(0, 0);
+  ajustarKanban();
+  const k = app.querySelector('.kanban'); kTela = k ? tela.nome : null;
+  if (k && kPos) [k.scrollLeft, k.scrollTop] = kPos; // ao atualizar o funil, o quadro fica onde estava
 }
+var kTela = null;
+// Altura do quadro = do topo dele até o fim da tela, para a barra de rolagem lateral não ficar lá embaixo
+function ajustarKanban() {
+  const k = document.querySelector('#app .kanban'); if (!k) return;
+  k.style.maxHeight = Math.max(320, window.innerHeight - k.getBoundingClientRect().top - 12) + 'px';
+}
+window.addEventListener('resize', ajustarKanban);
 
 function cartao(im) {
   const { total, completo } = pontuar(im);
