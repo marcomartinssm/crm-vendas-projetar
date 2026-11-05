@@ -1935,10 +1935,10 @@ function telaPontos() {
       ${grupos.map(g => { const its = r.itens.filter(i => i.grupo === g); const sub = its.reduce((a, i) => a + Number(i.pontos), 0);
         return `<div class="bloco" style="margin-top:12px"><h3 style="display:flex;justify-content:space-between"><span>${esc(g)}</span><span>${fmtPts(sub)}</span></h3>
           ${its.map(i => `<div class="linha"><span>${esc(i.item)}</span><span style="${Number(i.pontos) < 0 ? 'color:var(--vermelho)' : Number(i.pontos) > 0 ? 'font-weight:600' : 'color:var(--suave)'}">${fmtPts(i.pontos)}</span></div>`).join('')}</div>`; }).join('')}
-      <div class="dica" style="margin-top:10px">O total do semestre nunca fica negativo. A recompensa do líder ainda será definida.</div>`;
+      <div class="dica" style="margin-top:10px">O total do semestre nunca fica negativo. Prêmio do líder do semestre: 📱 iPhone 18.</div>`;
   }
   return `<div class="det">
-    <div class="card"><h2 style="font-size:16px;margin:0 0 2px">Ranking do semestre</h2><div class="dica" style="margin-bottom:8px">${esc(sem?.nome || 'Game de desenvolvimento')} · ${periodo}</div>${sem?.teste ? '<div class="aviso" style="background:var(--ambar-claro);color:var(--ambar);margin-bottom:8px">Semestre de teste: serve para todos aprenderem o sistema. O semestre oficial começa em 01/01/2027, com pontuação zerada.</div>' : ''}${linhas || '<div class="dica">Nenhum corretor no game.</div>'}
+    <div class="card"><h2 style="font-size:16px;margin:0 0 2px">Ranking do semestre</h2><div class="dica" style="margin-bottom:8px">${esc(sem?.nome || 'Game de desenvolvimento')} · ${periodo}</div><div class="aviso" style="background:var(--verde-claro);color:var(--verde);margin-bottom:8px">🏆 Prêmio para o 1º lugar do semestre: <b>iPhone 18</b></div>${sem?.teste ? '<div class="aviso" style="background:var(--ambar-claro);color:var(--ambar);margin-bottom:8px">Semestre de teste: serve para todos aprenderem o sistema. O semestre oficial começa em 01/01/2027, com pontuação zerada.</div>' : ''}${linhas || '<div class="dica">Nenhum corretor no game.</div>'}
       <div class="dica" style="margin-top:10px">Atualiza sozinho com o que é registrado no funil, nos imóveis e nas atividades.</div></div>
     <div class="card">${det}</div>
   </div>`;
