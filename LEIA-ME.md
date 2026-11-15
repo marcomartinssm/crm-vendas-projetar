@@ -42,6 +42,7 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 - Envia pela instância Seguralta para o grupo **Pré-atendimento Projetar** (id em `crm_vendas_relatorio_config.grupo`). O número precisa estar no grupo.
 - **Diário:** seg–sex 18h30 (o dia de hoje). **Semanal:** sábado 9h (sábado a sexta). **Mensal:** dia 1 às 8h05 (mês anterior). pg_cron `crm-vendas-relatorio-*` → `crm_vendas_chamar_relatorio(tipo)`.
 - Cada envio fica em `crm_vendas_relatorios` (não manda duas vezes o mesmo período).
+- **Conferência (lead por lead):** `POST ...&acao=detalhe&data=AAAA-MM-DD[&teste=1]` manda no grupo nome, telefone, fase atual e cada atualização do dia (movimentos + interações do CRM Leads, com a observação) dos leads da SDR, em partes de ~3500 caracteres. Números de `crm_vendas_sdr_detalhe(inicio, fim, corretor)` (só service_role). Pedido do Marco para 16/11/2026 (pg_cron `crm_vendas_conferencia_sdr_16_11`, 18h35, se apaga depois de rodar).
 
 ## Entrada (DESLIGADA em 03/11/2026)
 - O Marco achou que não ficou bom para a SDR: ela cadastra à mão em "+ Novo lead". Aba escondida (`veEntrada` = false), `entrada_instancias` vazio (a função ignora o venda-ara) e gatilho `zz_crm_vendas_entrada_do_aluguel` desativado. Tabela e funções ficaram; para religar, desfazer esses três pontos.

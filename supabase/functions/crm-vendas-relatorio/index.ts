@@ -5,6 +5,7 @@
 //   POST acao=relatorio&tipo=dia|semana|mes[&teste=1][&forcar=1]   monta e envia (teste=1 só devolve o texto)
 //   GET  acao=grupos                                               grupos do número que envia (para achar o id do grupo)
 //   POST acao=avisos[&teste=1]                                     envia os avisos pendentes aos corretores (pg_cron a cada 2 min)
+//   POST acao=detalhe&data=AAAA-MM-DD[&teste=1]                    conferência: lead por lead (nome, telefone, o que a SDR atualizou no dia)
 //
 // Os números vêm de crm_vendas_sdr_resumo(inicio, fim, corretor), um bloco para cada SDR em crm_vendas_config.sdrs.
 // Quem envia e para onde: crm_vendas_relatorio_config (instancia e grupo — id do grupo, termina em @g.us).
@@ -226,6 +227,72 @@ async function gerarRelatorio(tipo: TipoRelatorio, opcoes: { teste?: boolean; fo
   return { tipo, inicio, enviado: r.ok, status: r.status, texto };
 }
 
+// ---------- relatório detalhado (conferência com a SDR) ----------
+
+const horaBR = (iso: string) => {
+  const t = new Date(new Date(iso).getTime() - FUSO_MS);
+  return `${String(t.getUTCHours()).padStart(2, "0")}:${String(t.getUTCMinutes()).padStart(2, "0")}`;
+};
+
+// Quebra em mensagens de até ~3500 caracteres sem cortar um lead no meio.
+function partes(cab: string, blocos: string[]) {
+  const out: string[] = [];
+  let atual = cab;
+  for (const b of blocos) {
+    if (atual.length + b.length + 2 > 3500 && atual !== cab) { out.push(atual); atual = ""; }
+    atual += (atual ? "\n\n" : "") + b;
+  }
+  if (atual) out.push(atual);
+  return out.map((t, i) => out.length > 1 ? `${t}\n\n_(${i + 1}/${out.length})_` : t);
+}
+
+async function gerarDetalhe(data: string, opcoes: { teste?: boolean }) {
+  const [a, m, d] = data.split("-").map(Number);
+  const inicio = meiaNoiteBR(a, m - 1, d), fim = meiaNoiteBR(a, m - 1, d + 1);
+  const { data: cfgSdr } = await db.from("crm_vendas_config").select("valor").eq("chave", "sdrs").maybeSingle();
+  const ids: string[] = Array.isArray(cfgSdr?.valor) ? cfgSdr.valor : [];
+  const { data: sdrs } = ids.length
+    ? await db.from("corretores").select("id, nome").in("id", ids).eq("ativo", true).order("nome")
+    : { data: [] as any[] };
+  const dow = DIAS[new Date(Date.UTC(a, m - 1, d)).getUTCDay()];
+
+  const mensagens: string[] = [];
+  for (const s of sdrs ?? []) {
+    const { data: leads, error } = await db.rpc("crm_vendas_sdr_detalhe", {
+      p_inicio: inicio.toISOString(), p_fim: fim.toISOString(), p_corretor: s.id,
+    });
+    if (error) throw error;
+    const lista = (leads ?? []) as any[];
+    const cab = [`*🔎 Conferência — leads atualizados pela SDR*`, `*👤 ${s.nome}* · _${dow}, ${ddmm(inicio)}/${a}_`,
+      `${lista.length} lead(s) com atualização no sistema neste dia.`].join("\n");
+    const blocos = lista.map((l, i) => {
+      const linhas = [`*${i + 1}. ${l.nome || "Sem nome"}* · ${l.telefone || "sem telefone"}`,
+        `Agora: ${l.funil_atual || "?"} → *${l.fase_atual || "?"}*${l.dono_atual && l.dono_atual !== s.nome ? ` (com ${l.dono_atual})` : ""}`];
+      for (const it of l.itens ?? []) {
+        const partesItem = [it.titulo, it.status ? `"${it.status}"` : "", it.contato || ""].filter(Boolean).join(" · ");
+        linhas.push(`• ${horaBR(it.quando)} · ${partesItem}${it.por_outro ? ` _(feito por ${it.por_outro})_` : ""}`);
+        if (it.obs) linhas.push(`   📝 ${String(it.obs).slice(0, 300)}`);
+      }
+      return linhas.join("\n");
+    });
+    mensagens.push(...partes(cab, blocos.length ? blocos : ["Nenhuma atualização registrada neste dia."]));
+  }
+  if (!mensagens.length) mensagens.push("Nenhum SDR ativo em crm_vendas_config.sdrs.");
+  if (opcoes.teste) return { data, enviado: false, teste: true, mensagens };
+
+  const c = await config();
+  if (!c.instancia || !c.grupo) return { data, enviado: false, motivo: "grupo ainda não configurado", mensagens };
+  const resultados = [];
+  for (const texto of mensagens) {
+    const r = await evo(`/message/sendText/${encodeURIComponent(c.instancia)}`, {
+      method: "POST", body: JSON.stringify({ number: c.grupo, text: texto }),
+    });
+    resultados.push({ ok: r.ok, status: r.status });
+    await new Promise((ok) => setTimeout(ok, 1500));
+  }
+  return { data, enviado: resultados.every((r) => r.ok), resultados, mensagens: mensagens.length };
+}
+
 // Grupos de que o número de envio participa (para achar o id do grupo pelo nome).
 async function listarGrupos(instanciaParam: string | null) {
   const inst = instanciaParam ?? (await config()).instancia;
@@ -405,7 +472,14 @@ Deno.serve(async (req) => {
       if (!teste && !EVOLUTION_API_KEY) return responder({ erro: "Falta o segredo EVOLUTION_API_KEY no Supabase." }, 500);
       return responder(await processarAvisos({ teste }));
     }
-    return responder({ erro: "acao deve ser relatorio, grupos ou avisos" }, 400);
+    if (acao === "detalhe") {
+      const data = url.searchParams.get("data") ?? "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return responder({ erro: "data deve ser AAAA-MM-DD" }, 400);
+      const teste = url.searchParams.get("teste") === "1";
+      if (!teste && !EVOLUTION_API_KEY) return responder({ erro: "Falta o segredo EVOLUTION_API_KEY no Supabase." }, 500);
+      return responder(await gerarDetalhe(data, { teste }));
+    }
+    return responder({ erro: "acao deve ser relatorio, grupos, avisos ou detalhe" }, 400);
   } catch (e) {
     console.error(e);
     return responder({ erro: String((e as Error)?.message ?? e) }, 500);
