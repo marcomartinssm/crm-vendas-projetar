@@ -44,6 +44,10 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 - Cada envio fica em `crm_vendas_relatorios` (não manda duas vezes o mesmo período).
 - **Conferência (lead por lead):** `POST ...&acao=detalhe&data=AAAA-MM-DD[&teste=1]` manda no grupo nome, telefone, fase atual e cada atualização do dia (movimentos + interações do CRM Leads, com a observação) dos leads da SDR, em partes de ~3500 caracteres. Números de `crm_vendas_sdr_detalhe(inicio, fim, corretor)` (só service_role). Pedido do Marco para 16/11/2026 (pg_cron `crm_vendas_conferencia_sdr_16_11`, 18h35, se apaga depois de rodar).
 
+## Importar planilha de leads (botão "📥 Importar planilha" no Pré-atendimento, SDR e gestor — 15/11/2026)
+- Feito para a planilha diária da **Construtora Carlessi** (colunas: Nome do lead, Empreendimento, Telefone, Interesse do lead, Preferência do lead, Observações, Feedback). A tela lê a 1ª aba no navegador (SheetJS 0.18.5 do cdnjs, carregado só nessa tela) e acha as colunas pelo nome: nome, telefone/celular/whats, empreend*, e junta interesse + preferência + observações.
+- `crm_vendas_importar_leads(linhas, origem, gravar)`: com `gravar=false` só confere (prévia: novo / já é lead / telefone inválido / repetido na planilha); com `true` cria no **Pré-atendimento → Novo Lead** (o gatilho passa para a SDR), origem = mídia digitada (padrão "Construtora Carlessi"), campanha = empreendimento, observações no 1º movimento. Telefone que já é lead não duplica: grava "Novo cadastro" (selo "Voltou a se cadastrar" + aviso no grupo).
+
 ## Entrada (DESLIGADA em 03/11/2026)
 - O Marco achou que não ficou bom para a SDR: ela cadastra à mão em "+ Novo lead". Aba escondida (`veEntrada` = false), `entrada_instancias` vazio (a função ignora o venda-ara) e gatilho `zz_crm_vendas_entrada_do_aluguel` desativado. Tabela e funções ficaram; para religar, desfazer esses três pontos.
 - Como funcionava:

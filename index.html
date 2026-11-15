@@ -434,6 +434,7 @@ function render() {
   const leadAberto = tela.nome === 'lead' ? FUN.leads.find(x => x.id === tela.id) : null;
   const atual = leadAberto ? (tela.de || abaDoLead(leadAberto))
     : ['painel', 'comissao', 'pontos', 'ativ', 'pre', 'fila', 'nut', 'entrada', 'aprovacao'].includes(tela.nome) ? tela.nome
+    : tela.nome === 'importar' ? 'pre'
     : ['funil', 'lead', 'novolead'].includes(tela.nome) ? 'funil' : 'lista';
   document.getElementById('abas').innerHTML = abas.map(([k, t]) => `<button data-aba="${k}" class="${atual === k ? 'on' : ''}">${t}</button>`).join('');
   const app = document.getElementById('app');
@@ -455,6 +456,7 @@ function render() {
     const th = app.querySelector('.gchk th.ghoje'); if (th) { const box = th.closest('div'); box.scrollLeft = Math.max(0, th.offsetLeft - 260); } }
   else if (tela.nome === 'lead') app.innerHTML = telaLead();
   else if (tela.nome === 'novolead') app.innerHTML = telaNovoLead();
+  else if (tela.nome === 'importar') app.innerHTML = telaImportar();
   if (tela.nome === 'det') extrasDetalhe(tela.id);
   if (tela.nome === 'lead') historicoLead(tela.id);
   window.scrollTo(0, 0);
@@ -1393,7 +1395,7 @@ function telaFunil(modo) {
       html += `<div class="kgrp"><div class="khead"><span>Visita</span><span style="color:var(--suave)">${n}</span></div><div class="sub">${col(fv)}${fn ? col(fn) : ''}</div></div>`;
     } else html += col(f);
   }
-  const fim = pre ? `<span class="s" style="margin-left:auto;color:var(--suave)">${FUN.sdrs.length ? 'Pré-atendimento do SDR' : 'Ainda sem SDR: cada corretor faz o pré-atendimento dos próprios leads'}</span><button class="principal" data-novolead>+ Novo lead</button>`
+  const fim = pre ? `<span class="s" style="margin-left:auto;color:var(--suave)">${FUN.sdrs.length ? 'Pré-atendimento do SDR' : 'Ainda sem SDR: cada corretor faz o pré-atendimento dos próprios leads'}</span>${podeImportar() ? '<button data-impabrir>📥 Importar planilha</button>' : ''}<button class="principal" data-novolead>+ Novo lead</button>`
     : nut ? '<span class="s" style="margin-left:auto;color:var(--suave)">O retorno vence N dias depois que o lead entra na coluna · Hibernado não tem data</span>'
     : '<button class="principal" data-novolead style="margin-left:auto">+ Novo lead</button>';
   return `${barraFiltros(funilId, nut ? 'Só vencidos' : 'Só atrasados', atrasado, fim)}
@@ -1596,6 +1598,82 @@ async function historicoLead(id) {
     <div style="color:var(--suave)">Status: "${esc(m.status_nome || '')}"${m.extras && m.extras.contato ? ' · ' + esc(m.extras.contato) : ''}${m.observacao ? ' · ' + esc(m.observacao) : ''}${esc(extrasTxt(m.extras || {}))}</div>
     <div style="color:var(--suave);font-size:12px">${new Date(m.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</div></div>`).join('') || '<div style="color:var(--suave);font-size:14px">Nenhuma movimentação registrada ainda. As mudanças de etapa feitas a partir de agora aparecem aqui.</div>');
 }
+// ---------- importar planilha de leads (ex.: planilha diária da Construtora Carlessi) — SDR e gestor ----------
+// Lê a 1ª aba no navegador (SheetJS), acha as colunas pelo nome e manda para crm_vendas_importar_leads:
+// primeiro só confere (prévia), depois cria. Telefone que já é lead não duplica: vira "Voltou a se cadastrar".
+const IMP = { origem: 'Construtora Carlessi', arquivo: '', linhas: [], previa: null, feito: null, erro: '', ocupado: false };
+const podeImportar = () => gestor() || (!VER && (FUN.sdrs || []).includes(MEU_CORRETOR));
+function carregarSheetJS() {
+  if (window.XLSX) return Promise.resolve();
+  return new Promise((ok, falha) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; sc.onload = ok; sc.onerror = () => falha(new Error('Não foi possível carregar o leitor de planilhas.')); document.head.appendChild(sc); });
+}
+async function lerPlanilha(arquivo) {
+  await carregarSheetJS();
+  const wb = XLSX.read(await arquivo.arrayBuffer(), { type: 'array' });
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: false });
+  const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const iCab = rows.findIndex(r => r.some(c => /telefone|celular|whats/.test(norm(c))));
+  if (iCab < 0) throw new Error('Não achei a coluna de telefone na primeira aba.');
+  const cab = rows[iCab].map(norm);
+  const col = (re) => cab.findIndex(c => re.test(c));
+  const cNome = col(/nome/), cTel = col(/telefone|celular|whats/), cEmp = col(/empreend/);
+  const cObs = cab.map((c, i) => /interesse|prefer|observ/.test(c) ? i : -1).filter(i => i >= 0);
+  return rows.slice(iCab + 1).map(r => ({
+    nome: cNome >= 0 ? String(r[cNome] || '').trim() : '',
+    telefone: String(r[cTel] || '').trim(),
+    empreendimento: cEmp >= 0 ? String(r[cEmp] || '').trim() : '',
+    obs: cObs.map(i => String(r[i] || '').trim() ? `${rows[iCab][i]}: ${String(r[i]).trim()}` : '').filter(Boolean).join(' · '),
+  })).filter(l => l.nome || l.telefone);
+}
+async function conferirImportacao(gravar) {
+  IMP.ocupado = true; IMP.erro = ''; render();
+  const { data, error } = await db.rpc('crm_vendas_importar_leads', { p_linhas: IMP.linhas, p_origem: IMP.origem.trim(), p_gravar: gravar });
+  IMP.ocupado = false;
+  if (error) { IMP.erro = error.message; render(); return; }
+  if (gravar) { IMP.feito = data; IMP.previa = null; await carregarFunil(); } else IMP.previa = data;
+  render();
+}
+function telaImportar() {
+  const lista = IMP.feito || IMP.previa || [];
+  const conta = (st) => lista.filter(x => x.status === st).length;
+  const rotulo = { novo: ['verde', IMP.feito ? 'Criado' : 'Novo'], existente: ['azul', IMP.feito ? 'Marcado: voltou' : 'Já é lead'], erro: ['vermelho', 'Fica de fora'], repetido: ['', 'Repetido'] };
+  const linhas = lista.map(x => `<div class="linha" style="align-items:flex-start;gap:10px">
+    <span><b>${esc(x.nome || 'Sem nome')}</b> · ${esc(x.telefone || '—')}${x.empreendimento ? ` <span class="selo">${esc(x.empreendimento)}</span>` : ''}
+      ${x.obs ? `<div class="s" style="color:var(--suave)">${esc(x.obs)}</div>` : ''}
+      ${x.status === 'existente' ? `<div class="s" style="color:var(--suave)">Cadastrado como ${esc(x.nome_atual || '')} · ${esc(x.funil || '')} → ${esc(x.fase || '')} · com ${esc(x.corretor || 'sem corretor')}</div>` : ''}
+      ${x.motivo ? `<div class="s" style="color:var(--vermelho)">${esc(x.motivo)}</div>` : ''}</span>
+    <span class="selo ${rotulo[x.status]?.[0] || ''}">${rotulo[x.status]?.[1] || esc(x.status)}</span></div>`).join('');
+  return `<div style="margin-bottom:10px"><button data-impvoltar>← Voltar para o pré-atendimento</button></div>
+  <div class="card" style="max-width:760px">
+    <h2>Importar planilha de leads</h2>
+    <div class="s" style="color:var(--suave);margin-bottom:12px">Os leads novos entram no Pré-atendimento, em <b>Novo lead</b>, com a SDR. O empreendimento vai como campanha e as observações (interesse, preferência…) no histórico. Telefone que já é lead não duplica: o lead ganha o selo "Voltou a se cadastrar" e o grupo é avisado.</div>
+    <div class="grade"><div class="q"><label>Mídia de origem *</label><input id="imp_origem" value="${esc(IMP.origem)}" list="imp_origens"><datalist id="imp_origens"><option>Construtora Carlessi</option></datalist></div>
+      <div class="q"><label>Planilha (.xlsx ou .csv)</label><input type="file" id="imp_arq" accept=".xlsx,.xls,.csv"></div></div>
+    ${IMP.arquivo ? `<div class="s" style="margin-bottom:8px">Arquivo: <b>${esc(IMP.arquivo)}</b> · ${IMP.linhas.length} linha(s) com dados</div>` : ''}
+    ${IMP.erro ? `<div class="erro">${esc(IMP.erro)}</div>` : ''}
+    ${IMP.ocupado ? '<div class="s" style="color:var(--suave)">Conferindo…</div>' : ''}
+    ${lista.length ? `<div class="aviso" style="background:${IMP.feito ? 'var(--verde-claro);color:var(--verde)' : 'var(--azul-claro);color:var(--azul)'}">
+        ${IMP.feito ? `<b>Pronto.</b> ${conta('novo')} lead(s) criado(s) · ${conta('existente')} marcado(s) como "voltou a se cadastrar"` : `${conta('novo')} novo(s) · ${conta('existente')} já cadastrado(s)`}${conta('erro') + conta('repetido') ? ` · ${conta('erro') + conta('repetido')} fora` : ''}</div>
+      <div class="bloco">${linhas}</div>` : ''}
+    ${IMP.previa && (conta('novo') + conta('existente')) ? `<button class="principal" data-impgravar ${IMP.ocupado ? 'disabled' : ''}>Criar ${conta('novo')} lead(s)${conta('existente') ? ` e marcar ${conta('existente')} como "voltou"` : ''}</button>` : ''}
+  </div>`;
+}
+document.addEventListener('change', async e => {
+  if (e.target.id === 'imp_origem') { IMP.origem = e.target.value; if (IMP.linhas.length) conferirImportacao(false); }
+  if (e.target.id === 'imp_arq' && e.target.files[0]) {
+    const f = e.target.files[0];
+    Object.assign(IMP, { arquivo: f.name, linhas: [], previa: null, feito: null, erro: '' });
+    try { IMP.linhas = await lerPlanilha(f); } catch (er) { IMP.erro = er.message; render(); return; }
+    if (!IMP.linhas.length) { IMP.erro = 'A planilha não tem linhas com nome ou telefone.'; render(); return; }
+    conferirImportacao(false);
+  }
+});
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-impabrir], [data-impvoltar], [data-impgravar]'); if (!b) return;
+  if (b.dataset.impabrir !== undefined) { Object.assign(IMP, { arquivo: '', linhas: [], previa: null, feito: null, erro: '' }); tela = { nome: 'importar' }; render(); }
+  else if (b.dataset.impvoltar !== undefined) { tela = { nome: 'pre' }; render(); }
+  else if (b.dataset.impgravar !== undefined) { if (!IMP.origem.trim()) { IMP.erro = 'Informe a mídia de origem.'; render(); return; } conferirImportacao(true); }
+});
 function telaNovoLead() {
   return `<div style="margin-bottom:10px"><button data-voltarfunil>← Voltar</button></div>
   <div class="card" style="max-width:560px">
