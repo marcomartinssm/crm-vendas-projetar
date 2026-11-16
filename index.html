@@ -1197,7 +1197,8 @@ async function carregarFunil() {
     db.from('leads').select('id, nome, telefone, email, origem, campanha, codigo_imovel, corretor_id, fase_id, funil_id, fase_atualizada_em, valor_negociacao, created_at').in('funil_id', funis).order('fase_atualizada_em', { ascending: false }).limit(3000),
   ]);
   if (f.error || st.error || ld.error) { aviso('Não foi possível carregar o funil.', true); return; }
-  FUN.fases = f.data; FUN.status = st.data; FUN.leads = VER ? ld.data.filter(l => l.corretor_id === VER) : ld.data;
+  FUN.fases = f.data; FUN.status = st.data; // Vendo como SDR: ela enxerga os próprios leads e todo o pré-atendimento (mesma regra do banco).
+  FUN.leads = VER ? ld.data.filter(l => l.corretor_id === VER || (FUN.sdrs.includes(VER) && l.funil_id === FUN.pre?.funil)) : ld.data;
   // Avisos de prazo (mesma regra que vai para a pontuação): fica o mais grave de cada lead.
   const { data: al } = await db.rpc('crm_vendas_alertas');
   FUN.alerta = {};
@@ -1602,7 +1603,7 @@ async function historicoLead(id) {
 // Lê a 1ª aba no navegador (SheetJS), acha as colunas pelo nome e manda para crm_vendas_importar_leads:
 // primeiro só confere (prévia), depois cria. Telefone que já é lead não duplica: vira "Voltou a se cadastrar".
 const IMP = { origem: 'Construtora Carlessi', arquivo: '', linhas: [], previa: null, feito: null, erro: '', ocupado: false };
-const podeImportar = () => gestor() || (!VER && (FUN.sdrs || []).includes(MEU_CORRETOR));
+const podeImportar = () => gestor() || (FUN.sdrs || []).includes(VER || MEU_CORRETOR);
 function carregarSheetJS() {
   if (window.XLSX) return Promise.resolve();
   return new Promise((ok, falha) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; sc.onload = ok; sc.onerror = () => falha(new Error('Não foi possível carregar o leitor de planilhas.')); document.head.appendChild(sc); });
@@ -2272,7 +2273,10 @@ async function entrar(s) {
   if (souAprovador) {
     const { data: g } = await db.rpc('crm_vendas_corretores_game');
     const ids = (g || []).map(x => typeof x === 'string' ? x : Object.values(x)[0]);
-    $('vercomo').innerHTML = '<option value="">Gestor (você)</option>' + ids.map(id => `<option value="${id}">${esc(CORRETORES[id] || id)} (corretor)</option>`).join('');
+    // SDRs ficam fora do jogo (pontuação), mas o gestor também pode ver o sistema como eles.
+    const { data: sc } = await db.from('crm_vendas_config').select('valor').eq('chave', 'sdrs').maybeSingle();
+    const sdrs = (sc?.valor || []).filter(id => !ids.includes(id));
+    $('vercomo').innerHTML = '<option value="">Gestor (você)</option>' + sdrs.map(id => `<option value="${id}">${esc(CORRETORES[id] || id)} (SDR)</option>`).join('') + ids.map(id => `<option value="${id}">${esc(CORRETORES[id] || id)} (corretor)</option>`).join('');
   }
   $('login').hidden = true; $('app').hidden = false; $('quem').hidden = false;
   await Promise.all([carregar(), carregarFunil()]);
@@ -2292,7 +2296,7 @@ $('vercomo').addEventListener('change', async (e) => {
   $('quem-nome').textContent = VER ? `vendo como ${CORRETORES[VER]}` : `${NOME_GESTOR} · gestor`;
   ATV.carregado = false; ATV.metas = null; PTS.carregado = false; PTS.ranking = null; COM.carregado = false; COM.dados = null; PNL.dados = null;
   await Promise.all([carregar(), carregarFunil()]);
-  tela = { nome: 'funil' }; render();
+  tela = { nome: VER && FUN.sdrs.includes(VER) ? 'pre' : 'funil' }; render();
 });
 $('sair').addEventListener('click', async () => { await db.auth.signOut(); entrar(null); });
 // ---------- link do celular: entra com nome + 4 últimos números (sem senha) ----------
