@@ -1425,7 +1425,7 @@ async function carregarDescartados() {
 }
 function telaDescartados() {
   if (!FUN.cfg) return '<div class="vazio">Carregando…</div>';
-  const motivoDe = (l) => DESC.mot[l.id]?.status_nome || 'Sem motivo registrado';
+  const motivoDe = (l) => DESC.mot[l.id]?.status_nome || 'Sem motivo (descarte antigo)';
   const quandoDe = (l) => new Date(DESC.mot[l.id]?.quando || l.fase_atualizada_em || l.created_at);
   const base = leadsDescartados().filter(passaFiltro);
   const ls = base.filter(l => !DESC.motivo || motivoDe(l) === DESC.motivo).sort((a, b) => quandoDe(b) - quandoDe(a));
