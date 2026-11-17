@@ -143,6 +143,13 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 - Repositório público `marcomartinssm/crm-vendas-projetar` (GitHub Pages, branch main, raiz). Para atualizar: commit + push na main; o site atualiza em ~1 minuto.
 - O CRM Leads continua separado (`crmleads-projetar`), como segurança.
 
+## Descartados (aba própria, 16/11/2026)
+- A coluna "Descartado" saiu dos quadros do Pré-atendimento e do Funil de vendas. Os descartados ficam na aba **Descartados**: lista com motivo (último movimento do tipo descartado), observação, data, corretor, filtros por motivo e corretor.
+- **Reativar** (gestor, dono do lead ou SDR) chama `crm_vendas_reativar_lead`: o lead volta para Pré-atendimento → Novo lead **com o mesmo corretor** e ganha o movimento "Reativado".
+- **Recadastro**: o gatilho `crm_vendas_aviso_recadastro` (interação "Novo cadastro") continua avisando e, se o lead estiver descartado ou na Nutrição, devolve sozinho para Pré-atendimento → Novo lead (movimento "Voltou a se cadastrar"). Lead em andamento fica onde está.
+- "Não responde mais" não descarta mais: os status 13 e 23 foram desativados e o novo "Não responde mais (vai para a nutrição, retorno em 90 dias)" leva para Nutrição → 90 dias (pré e vendas). Em "Perdido" o "Não responde mais" continua igual.
+- Os descartes antigos com "Não responde mais" continuam em Descartados.
+
 ## Vigia do servidor (aviso de queda no grupo)
 - O GitHub (`.github/workflows/servidor-monitor.yml`) testa o Supabase a cada 5 minutos (3 tentativas). Se cair, avisa no grupo uma vez, com o passo a passo para reiniciar; quando voltar, avisa de novo com quanto tempo ficou fora.
 - Quem manda a mensagem é a função `servidor-monitor`, que não depende do banco. Ela só aceita o token e o destino que estão nos segredos do GitHub (`MONITOR_TOKEN`, `MONITOR_DESTINO` = `instancia|grupo`); no código ficam só os hashes.

@@ -64,6 +64,7 @@
   [data-aba=pre] { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/%3E%3C/svg%3E"); }
   [data-aba=funil] { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 3H2l8 9.46V19l4 2v-8.54z'/%3E%3C/svg%3E"); }
   [data-aba=nut] { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E"); }
+  [data-aba=desc] { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='4' rx='1'/%3E%3Cpath d='M5 8v11a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8'/%3E%3Cpath d='M10 12h4'/%3E%3C/svg%3E"); }
   [data-aba=lista] { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/%3E%3Cpath d='M9 22V12h6v10'/%3E%3C/svg%3E"); }
   [data-aba=ativ] { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18'/%3E%3Cpath d='m9 16 2 2 4-4'/%3E%3C/svg%3E"); }
   [data-aba=pontos] { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9H4a2 2 0 0 1 0-4h2M18 9h2a2 2 0 0 0 0-4h-2'/%3E%3Cpath d='M6 3h12v7a6 6 0 0 1-12 0z'/%3E%3Cpath d='M12 16v3M8 22h8M10 19h4'/%3E%3C/svg%3E"); }
@@ -429,11 +430,11 @@ function render() {
   document.getElementById('abas').hidden = modoLink;
   const abas = gestor() ? [['painel', 'Painel']] : [];
   if (veEntrada()) abas.push(['entrada', ENT.lista.length ? `Entrada (${ENT.lista.length})` : 'Entrada']);
-  abas.push(['fila', 'Fila do dia'], ['pre', 'Pré-atendimento'], ['funil', 'Funil de vendas'], ['nut', 'Nutrição'], ['lista', 'Imóveis'], ['ativ', 'Atividades'], ['pontos', 'Pontuação'], ['comissao', 'Comissão']);
+  abas.push(['fila', 'Fila do dia'], ['pre', 'Pré-atendimento'], ['funil', 'Funil de vendas'], ['nut', 'Nutrição'], ['desc', 'Descartados'], ['lista', 'Imóveis'], ['ativ', 'Atividades'], ['pontos', 'Pontuação'], ['comissao', 'Comissão']);
   if (gestor()) { const n = DB.imoveis.filter(i => i.status === 'aguardando').length + POSSE.length; abas.push(['aprovacao', n ? `Aprovação 🔔 ${n}` : 'Aprovação (0)']); }
   const leadAberto = tela.nome === 'lead' ? FUN.leads.find(x => x.id === tela.id) : null;
   const atual = leadAberto ? (tela.de || abaDoLead(leadAberto))
-    : ['painel', 'comissao', 'pontos', 'ativ', 'pre', 'fila', 'nut', 'entrada', 'aprovacao'].includes(tela.nome) ? tela.nome
+    : ['painel', 'comissao', 'pontos', 'ativ', 'pre', 'fila', 'nut', 'desc', 'entrada', 'aprovacao'].includes(tela.nome) ? tela.nome
     : tela.nome === 'importar' ? 'pre'
     : ['funil', 'lead', 'novolead'].includes(tela.nome) ? 'funil' : 'lista';
   document.getElementById('abas').innerHTML = abas.map(([k, t]) => `<button data-aba="${k}" class="${atual === k ? 'on' : ''}">${t}</button>`).join('');
@@ -447,6 +448,7 @@ function render() {
   else if (tela.nome === 'funil') app.innerHTML = telaFunil('vendas');
   else if (tela.nome === 'pre') app.innerHTML = telaFunil('pre');
   else if (tela.nome === 'nut') app.innerHTML = telaFunil('nut');
+  else if (tela.nome === 'desc') { app.innerHTML = telaDescartados(); if (!DESC.carregado) carregarDescartados(); }
   else if (tela.nome === 'fila') app.innerHTML = telaFila();
   else if (tela.nome === 'entrada') app.innerHTML = telaEntrada();
   else if (tela.nome === 'painel') { app.innerHTML = telaPainel(); if (!PNL.dados) carregarPainel(); }
@@ -1184,6 +1186,7 @@ document.addEventListener('click', e => {
 // ---------- funis: Pré-atendimento (SDR) e Funil de vendas (funil "Atendimento" do CRM Leads) ----------
 const FUN = { cfg: null, pre: null, nut: null, sdrs: [], fases: [], status: [], leads: [], busca: '', corretor: '', recad: {} };
 async function carregarFunil() {
+  DESC.carregado = false; // motivos dos descartados recarregam junto com o funil
   const { data: cs } = await db.from('crm_vendas_config').select('chave, valor').in('chave', ['funil_vendas', 'funil_pre', 'sdrs']);
   const c = Object.fromEntries((cs || []).map(x => [x.chave, x.valor]));
   if (!c.funil_vendas) { aviso('Funil de vendas não configurado.', true); return; }
@@ -1390,6 +1393,7 @@ function telaFunil(modo) {
   let html = '';
   for (const f of fasesFunil) {
     if (f.id === c.noshow) continue;
+    if (faseDescartada(f.id)) continue; // descartados ficam na aba própria
     if (f.id === c.visita) {
       const fv = f, fn = FUN.fases.find(x => x.id === c.noshow);
       const n = filtrados.filter(l => l.fase_id === fv.id || l.fase_id === fn?.id).length;
@@ -1404,6 +1408,61 @@ function telaFunil(modo) {
 }
 // Fila do dia: o que fazer hoje, separado por funil e na ordem de urgência.
 // Some da fila quem já teve contato registrado hoje (menos quem tem aviso de atraso).
+// ---------- Descartados: fora dos quadros, numa lista própria (desde 16/11/2026) ----------
+// Etapa "descartada" = a que recebe status do tipo descartado (Descartado do pré e do funil de vendas).
+const faseDescartada = (id) => (FUN.status || []).some(s => s.fase_id === id && s.tipo === 'descartado');
+const DESC = { carregado: false, mot: {}, motivo: '' };
+const leadsDescartados = () => FUN.leads.filter(l => faseDescartada(l.fase_id) && (gestor() || l.corretor_id === usuario || (eSdr(usuario) && noPre(l))));
+const podeReativar = (l) => gestor() || l.corretor_id === usuario || eSdr(usuario);
+async function carregarDescartados() {
+  const ids = leadsDescartados().map(l => l.id), mot = {};
+  for (let i = 0; i < ids.length; i += 150) {
+    const { data } = await db.from('crm_vendas_movimentos').select('lead_id, status_nome, observacao, quando').in('lead_id', ids.slice(i, i + 150)).eq('status_tipo', 'descartado');
+    (data || []).forEach(m => { if (!mot[m.lead_id] || new Date(m.quando) > new Date(mot[m.lead_id].quando)) mot[m.lead_id] = m; });
+  }
+  DESC.mot = mot; DESC.carregado = true;
+  if (tela.nome === 'desc') render();
+}
+function telaDescartados() {
+  if (!FUN.cfg) return '<div class="vazio">Carregando…</div>';
+  const motivoDe = (l) => DESC.mot[l.id]?.status_nome || 'Sem motivo registrado';
+  const quandoDe = (l) => new Date(DESC.mot[l.id]?.quando || l.fase_atualizada_em || l.created_at);
+  const base = leadsDescartados().filter(passaFiltro);
+  const ls = base.filter(l => !DESC.motivo || motivoDe(l) === DESC.motivo).sort((a, b) => quandoDe(b) - quandoDe(a));
+  const cont = {}; base.forEach(l => { const m = motivoDe(l); cont[m] = (cont[m] || 0) + 1; });
+  const motivos = Object.entries(cont).sort((a, b) => b[1] - a[1]);
+  const curto = (m) => m.replace(/ \(.*\)$/, '').replace(' / desistiu de comprar', '');
+  const filtroMot = `<select id="fmotivo"><option value="">Todos os motivos</option>${motivos.map(([m, n]) => `<option value="${esc(m)}" ${DESC.motivo === m ? 'selected' : ''}>${esc(curto(m))} (${n})</option>`).join('')}</select>`;
+  const quadros = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px">
+    <div class="card" style="padding:10px 14px;min-width:90px"><div class="s" style="color:var(--suave)">Total</div><div style="font-size:22px;font-weight:600">${base.length}</div></div>
+    ${motivos.slice(0, 5).map(([m, n]) => `<div class="card" data-fmot="${esc(m)}" style="padding:10px 14px;min-width:110px;cursor:pointer;${DESC.motivo === m ? 'outline:2px solid var(--destaque)' : ''}"><div class="s" style="color:var(--suave)">${esc(curto(m))}</div><div style="font-size:22px;font-weight:600">${n}</div></div>`).join('')}
+  </div>`;
+  const linha = (l) => { const m = DESC.mot[l.id];
+    return `<div class="linha" style="align-items:center">
+      <div style="flex:1;min-width:0;cursor:pointer" data-lead="${l.id}"><b>${esc(l.nome || 'Sem nome')}</b>
+        <div class="s" style="color:var(--suave)">${esc(l.telefone || 'sem telefone')} · ${esc(l.origem || 'sem origem')} · ${esc(CORRETORES[l.corretor_id] || 'sem corretor')} · ${noPre(l) ? 'pré-atendimento' : 'funil de vendas'}</div>
+        ${m?.observacao ? `<div class="s" style="color:var(--suave);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📝 ${esc(m.observacao)}</div>` : ''}</div>
+      <span class="selo vermelho" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc(curto(motivoDe(l)))}</span>
+      <span class="s" style="color:var(--suave);width:44px;text-align:right">${quandoDe(l).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
+      ${podeReativar(l) ? `<button data-reativar="${l.id}" title="Volta para o Pré-atendimento, em Novo lead, com o mesmo corretor">↺ Reativar</button>` : '<span style="width:92px"></span>'}
+    </div>`; };
+  return `${barraFiltros(null, '', null, `${filtroMot}<span class="s" style="margin-left:auto;color:var(--suave)">Reativar devolve o lead para o Pré-atendimento (Novo lead). Se a pessoa se cadastrar de novo, ela volta sozinha.</span>`)}
+    ${DESC.carregado ? quadros : '<div class="s" style="color:var(--suave);margin-bottom:12px">Carregando os motivos…</div>'}
+    <div class="card" style="padding:4px 16px">${ls.length ? ls.slice(0, 300).map(linha).join('') : '<div class="vazio">Nenhum lead descartado com esse filtro.</div>'}</div>
+    ${ls.length > 300 ? `<div class="fmais">+${ls.length - 300} leads (use a busca ou os filtros)</div>` : ''}`;
+}
+document.addEventListener('change', (e) => { if (e.target.id === 'fmotivo') { DESC.motivo = e.target.value; render(); } });
+document.addEventListener('click', async (e) => {
+  const q = e.target.closest('[data-fmot]'); if (q) { DESC.motivo = DESC.motivo === q.dataset.fmot ? '' : q.dataset.fmot; render(); return; }
+  const b = e.target.closest('[data-reativar]'); if (!b) return;
+  const l = FUN.leads.find(x => x.id === b.dataset.reativar);
+  if (!confirm(`Reativar ${l?.nome || 'este lead'}? Ele volta para o Pré-atendimento, em Novo lead, com ${CORRETORES[l?.corretor_id] || 'o mesmo corretor'}.`)) return;
+  b.disabled = true;
+  const { error } = await db.rpc('crm_vendas_reativar_lead', { p_lead: b.dataset.reativar });
+  if (error) { aviso(error.message, true); b.disabled = false; return; }
+  aviso('Lead reativado: está no Pré-atendimento, em Novo lead.');
+  await carregarFunil(); render();
+});
 function telaFila() {
   if (!FUN.cfg) return '<div class="vazio">Carregando a fila…</div>';
   const c = FUN.cfg, p = FUN.pre || {};
@@ -1754,7 +1813,7 @@ document.addEventListener('click', async e => {
     render();
   }
   else if (ds.fecharmodal !== undefined) fecharModal();
-  else if (ds.lead) { tela = { nome: 'lead', id: ds.lead, de: ['fila', 'pre', 'nut', 'funil'].includes(tela.nome) ? tela.nome : null }; render(); }
+  else if (ds.lead) { tela = { nome: 'lead', id: ds.lead, de: ['fila', 'pre', 'nut', 'funil', 'desc'].includes(tela.nome) ? tela.nome : null }; render(); }
   else if (ds.voltarfunil !== undefined) { const l = FUN.leads.find(x => x.id === tela.id); tela = { nome: tela.de || (l ? abaDoLead(l) : 'funil') }; render(); }
   else if (ds.novolead !== undefined) { tela = { nome: 'novolead', de: ['pre', 'fila', 'funil'].includes(tela.nome) ? tela.nome : null }; render(); }
   else if (ds.mover) {
