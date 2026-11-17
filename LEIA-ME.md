@@ -148,7 +148,7 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 - **Reativar** (gestor, dono do lead ou SDR) chama `crm_vendas_reativar_lead`: o lead volta para Pré-atendimento → Novo lead **com o mesmo corretor** e ganha o movimento "Reativado".
 - **Recadastro**: o gatilho `crm_vendas_aviso_recadastro` (interação "Novo cadastro") continua avisando e, se o lead estiver descartado ou na Nutrição, devolve sozinho para Pré-atendimento → Novo lead (movimento "Voltou a se cadastrar"). Lead em andamento fica onde está.
 - "Não responde mais" não descarta mais: os status 13 e 23 foram desativados e o novo "Não responde mais (vai para a nutrição, retorno em 90 dias)" leva para Nutrição → 90 dias (pré e vendas). Em "Perdido" o "Não responde mais" continua igual.
-- Os descartes antigos com "Não responde mais" continuam em Descartados.
+- Em 16/11/2026 os 23 que estavam descartados por "Não responde mais" foram para Nutrição → 90 dias (movimento com a observação da regra nova), e o "Não responde mais" de **Perdido** (status 12) foi desativado: no funil de vendas fica só a opção que vai para a nutrição.
 
 ## Vigia do servidor (aviso de queda no grupo)
 - O GitHub (`.github/workflows/servidor-monitor.yml`) testa o Supabase a cada 5 minutos (3 tentativas). Se cair, avisa no grupo uma vez, com o passo a passo para reiniciar; quando voltar, avisa de novo com quanto tempo ficou fora.
