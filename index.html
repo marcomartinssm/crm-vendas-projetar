@@ -1354,6 +1354,8 @@ const recadPendente = (id) => { const r = FUN.recad?.[id]; if (!r || Date.now() 
 const eSdr = (corretorId) => FUN.sdrs.includes(corretorId);
 // Transferir: lead do SDR (ou qualquer lead, para o gestor) em qualquer etapa em aberto (desde 23/11/2026; antes só "Em atendimento" e "Agendamento de visita").
 const podeTransferir = (l) => ![FUN.cfg.venda, FUN.cfg.perdido, FUN.cfg.descartado, FUN.pre?.descartado].includes(l.fase_id) && (gestor() || eSdr(l.corretor_id));
+// Editar nome e telefone: só a SDR, nos leads dela e nos da Nutrição (cada mudança fica no histórico; desde 23/11/2026).
+const podeEditarContato = (l) => eSdr(usuario) && (l.corretor_id === usuario || noNut(l));
 const diasDesde = (ts) => ts ? Math.max(0, Math.floor((Date.now() - new Date(ts)) / 86400000)) : null;
 function cardLead(l, comEtapa) {
   const u = ultimoTxt(l.id);
@@ -1373,6 +1375,7 @@ function cardLead(l, comEtapa) {
     <div class="kult ${u.alerta ? 'alerta' : ''}">${esc(u.t)}</div>
     ${gestor() || l.corretor_id === usuario ? `<button class="kmover" data-moverrapido="${l.id}">→ Mover etapa</button>` : ''}
     ${podeTransferir(l) ? `<button class="kmover ktransf" data-transferir="${l.id}">⇄ Transferir atendimento</button>` : ''}
+    ${podeEditarContato(l) ? `<button class="kmover" data-editarcontato="${l.id}">✎ Editar nome/telefone</button>` : ''}
   </div>`;
 }
 function telaFunil(modo) {
@@ -1524,7 +1527,7 @@ function telaLead() {
   const atual = l.fase_id;
   const grupos = FUN.fases.filter(f => f.id !== atual && FUN.status.some(s => s.fase_id === f.id));
   const tel = String(l.telefone || '').replace(/\D/g, '');
-  return `<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap"><button data-voltarfunil>← Voltar para ${{ fila: 'a fila do dia', pre: 'o pré-atendimento', nut: 'a nutrição', funil: 'o funil' }[tela.de || abaDoLead(l)]}</button>${podeTransferir(l) ? `<button data-transferir="${l.id}">⇄ Transferir atendimento</button>` : ''}</div>
+  return `<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap"><button data-voltarfunil>← Voltar para ${{ fila: 'a fila do dia', pre: 'o pré-atendimento', nut: 'a nutrição', funil: 'o funil' }[tela.de || abaDoLead(l)]}</button>${podeTransferir(l) ? `<button data-transferir="${l.id}">⇄ Transferir atendimento</button>` : ''}${podeEditarContato(l) ? `<button data-editarcontato="${l.id}">✎ Editar nome/telefone</button>` : ''}</div>
   <div class="det">
     <div class="card">
       <h2 style="margin:0">${esc(l.nome || 'Sem nome')}</h2>
@@ -1608,6 +1611,18 @@ function abrirModalMover(id) {
   m.hidden = false;
   document.getElementById('mstatus').focus();
 }
+function abrirModalContato(id) {
+  const l = FUN.leads.find(x => x.id === id); if (!l) return;
+  const m = document.getElementById('modal');
+  m.innerHTML = `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h2 style="font-size:16px;margin:0">Editar nome e telefone</h2><button data-fecharmodal aria-label="Fechar">✕</button></div>
+    <div style="color:var(--suave);font-size:13px;margin-bottom:12px">A mudança fica registrada no histórico do lead (antes → depois).</div>
+    <div class="q"><label for="cnome">Nome *</label><input id="cnome" value="${esc(l.nome || '')}" autocomplete="off"></div>
+    <div class="q"><label for="ctel">Telefone (com DDD) *</label><input id="ctel" value="${esc(l.telefone || '')}" inputmode="tel" autocomplete="off"></div>
+    <div class="erro" id="cerro"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button data-fecharmodal>Cancelar</button><button class="principal" data-salvarcontato="${l.id}">Salvar</button></div></div>`;
+  m.hidden = false;
+  document.getElementById('cnome').focus();
+}
 async function abrirModalTransferir(id) {
   const l = FUN.leads.find(x => x.id === id); if (!l) return;
   const { data: sg } = await db.rpc('crm_vendas_sugerir_corretor', { p_lead: id });
@@ -1634,23 +1649,27 @@ function extrasMover(tipo) {
   return '';
 }
 async function historicoLead(id) {
-  const [{ data: movs }, { data: ints }, { data: ents }] = await Promise.all([
+  const [{ data: movs }, { data: ints }, { data: ents }, { data: eds }] = await Promise.all([
     db.from('crm_vendas_movimentos').select('*').eq('lead_id', id),
     db.from('interacoes').select('tipo, descricao, corretor_id, created_at').eq('lead_id', id),
     db.from('crm_vendas_entrada').select('fonte, instancia, origem, primeira_mensagem, classificado_em').eq('lead_id', id), // só SDR e gestor enxergam
+    db.from('crm_vendas_lead_edicoes').select('campo, de, para, corretor_id, quando').eq('lead_id', id),
   ]);
   const el = document.getElementById('hist-lead'); if (!el) return;
   // Interações do CRM Leads entram no histórico. Mover o lead aqui também grava uma interação no mesmo instante: essa fica de fora para não repetir.
   const tempos = (movs || []).map(m => new Date(m.quando).getTime());
   const data = [...(movs || []), ...(ints || []).map(i => ({ interacao: true, ...i, quando: dataUTC(i.created_at) }))
     .filter(i => !tempos.some(t => Math.abs(t - new Date(i.quando).getTime()) < 2000)),
-    ...(ents || []).map(e => ({ entrada: true, ...e, quando: e.classificado_em }))]
+    ...(ents || []).map(e => ({ entrada: true, ...e, quando: e.classificado_em })),
+    ...(eds || []).map(x => ({ edicao: true, ...x }))]
     .sort((a, b) => new Date(b.quando) - new Date(a.quando));
   const extrasTxt = (x) => { const p = [];
     if (x.data_visita) p.push('visita ' + new Date(x.data_visita).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }));
     if (x.valor) p.push(brl(x.valor)); if (x.honorario) p.push('honorário ' + x.honorario + '%');
     if (x.codigo_imovel) p.push('Cód. ' + x.codigo_imovel); return p.length ? ' · ' + p.join(' · ') : ''; };
-  el.innerHTML = '<h3>Histórico</h3>' + (data.map(m => m.entrada ? `<div class="hist"><b>Chegou pela Entrada <span class="selo">${m.fonte === 'aluguel' ? 'via aluguel · ' + esc(ATENDENTE_ALUGUEL[m.instancia] || m.instancia || '') : 'WhatsApp vendas'}</span></b>
+  el.innerHTML = '<h3>Histórico</h3>' + (data.map(m => m.edicao ? `<div class="hist"><b>${m.campo === 'nome' ? 'Nome alterado' : 'Telefone alterado'}</b>
+    <div style="color:var(--suave)">De "${esc(m.de || '—')}" para "${esc(m.para || '—')}"${CORRETORES[m.corretor_id] ? ' · por ' + esc(CORRETORES[m.corretor_id]) : ''}</div>
+    <div style="color:var(--suave);font-size:12px">${new Date(m.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</div></div>` : m.entrada ? `<div class="hist"><b>Chegou pela Entrada <span class="selo">${m.fonte === 'aluguel' ? 'via aluguel · ' + esc(ATENDENTE_ALUGUEL[m.instancia] || m.instancia || '') : 'WhatsApp vendas'}</span></b>
     <div style="color:var(--suave)">Mídia de origem: ${esc(m.origem || '—')}${m.primeira_mensagem ? ` · “${esc(String(m.primeira_mensagem).slice(0, 160))}”` : ''}</div>
     <div style="color:var(--suave);font-size:12px">${new Date(m.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</div></div>` : m.interacao ? `<div class="hist"><b>${esc(m.tipo || 'Interação')} <span class="selo">CRM Leads</span></b>
     <div style="color:var(--suave)">${esc(m.descricao || '')}${m.corretor_id && CORRETORES[m.corretor_id] ? ' · ' + esc(CORRETORES[m.corretor_id]) : ''}</div>
@@ -1793,12 +1812,24 @@ document.addEventListener('input', e => {
 document.addEventListener('click', async e => {
   if (e.target.id === 'modal') { fecharModal(); return; }
   if (e.target.closest('[data-soatrasados]')) { FUN.soAtrasados = !FUN.soAtrasados; render(); return; }
-  const b = e.target.closest('[data-copiar], [data-moverrapido], [data-transferir], [data-confirmartransf], [data-fecharmodal], [data-lead], [data-voltarfunil], [data-novolead], [data-mover], [data-salvarlead]');
+  const b = e.target.closest('[data-copiar], [data-moverrapido], [data-transferir], [data-confirmartransf], [data-editarcontato], [data-salvarcontato], [data-fecharmodal], [data-lead], [data-voltarfunil], [data-novolead], [data-mover], [data-salvarlead]');
   if (!b) return;
   const ds = b.dataset;
   if (ds.copiar) { navigator.clipboard.writeText(ds.copiar).then(() => aviso('Telefone copiado.'), () => aviso('Não foi possível copiar.', true)); }
   else if (ds.moverrapido) abrirModalMover(ds.moverrapido);
   else if (ds.transferir) abrirModalTransferir(ds.transferir);
+  else if (ds.editarcontato) abrirModalContato(ds.editarcontato);
+  else if (ds.salvarcontato) {
+    const er = document.getElementById('cerro');
+    b.disabled = true;
+    const { error } = await db.rpc('crm_vendas_editar_contato', { p_lead: ds.salvarcontato, p_nome: document.getElementById('cnome').value, p_telefone: document.getElementById('ctel').value });
+    b.disabled = false;
+    if (error) { er.textContent = error.message; return; }
+    aviso('Nome e telefone salvos. A mudança ficou no histórico.');
+    fecharModal();
+    await carregarFunil();
+    render();
+  }
   else if (ds.confirmartransf) {
     const cor = document.getElementById('tcor').value, er = document.getElementById('terro');
     if (!cor) { er.textContent = 'Escolha o corretor.'; return; }
