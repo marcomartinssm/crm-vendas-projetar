@@ -1200,8 +1200,8 @@ async function carregarFunil() {
     db.from('leads').select('id, nome, telefone, email, origem, campanha, codigo_imovel, corretor_id, fase_id, funil_id, fase_atualizada_em, valor_negociacao, created_at').in('funil_id', funis).order('fase_atualizada_em', { ascending: false }).limit(3000),
   ]);
   if (f.error || st.error || ld.error) { aviso('Não foi possível carregar o funil.', true); return; }
-  FUN.fases = f.data; FUN.status = st.data; // Vendo como SDR: ela enxerga os próprios leads e todo o pré-atendimento (mesma regra do banco).
-  FUN.leads = VER ? ld.data.filter(l => l.corretor_id === VER || (FUN.sdrs.includes(VER) && l.funil_id === FUN.pre?.funil)) : ld.data;
+  FUN.fases = f.data; FUN.status = st.data; // Vendo como SDR: ela enxerga os próprios leads e toda a Nutrição (mesma regra do banco, desde 22/11/2026).
+  FUN.leads = VER ? ld.data.filter(l => l.corretor_id === VER || (FUN.sdrs.includes(VER) && l.funil_id === FUN.nut)) : ld.data;
   // Avisos de prazo (mesma regra que vai para a pontuação): fica o mais grave de cada lead.
   const { data: al } = await db.rpc('crm_vendas_alertas');
   FUN.alerta = {};
@@ -1352,8 +1352,8 @@ const contatadoHoje = (id) => { const u = (FUN.ultimo || {})[id]; return !!u && 
 // Voltou a se cadastrar nos últimos 30 dias e ninguém falou com ele depois disso.
 const recadPendente = (id) => { const r = FUN.recad?.[id]; if (!r || Date.now() - new Date(r) > 30 * 86400000) return null; const u = FUN.ultimo?.[id]; return !u || new Date(r) > new Date(u.quando) ? r : null; };
 const eSdr = (corretorId) => FUN.sdrs.includes(corretorId);
-// Transferir: lead do SDR (ou qualquer lead, para o gestor) em "Em atendimento" ou "Agendamento de visita".
-const podeTransferir = (l) => [FUN.cfg.atendimento, FUN.cfg.agendamento].includes(l.fase_id) && (gestor() || eSdr(l.corretor_id));
+// Transferir: lead do SDR (ou qualquer lead, para o gestor) em qualquer etapa em aberto (desde 23/11/2026; antes só "Em atendimento" e "Agendamento de visita").
+const podeTransferir = (l) => ![FUN.cfg.venda, FUN.cfg.perdido, FUN.cfg.descartado, FUN.pre?.descartado].includes(l.fase_id) && (gestor() || eSdr(l.corretor_id));
 const diasDesde = (ts) => ts ? Math.max(0, Math.floor((Date.now() - new Date(ts)) / 86400000)) : null;
 function cardLead(l, comEtapa) {
   const u = ultimoTxt(l.id);
@@ -1412,7 +1412,7 @@ function telaFunil(modo) {
 // Etapa "descartada" = a que recebe status do tipo descartado (Descartado do pré e do funil de vendas).
 const faseDescartada = (id) => (FUN.status || []).some(s => s.fase_id === id && s.tipo === 'descartado');
 const DESC = { carregado: false, mot: {}, motivo: '' };
-const leadsDescartados = () => FUN.leads.filter(l => faseDescartada(l.fase_id) && (gestor() || l.corretor_id === usuario || (eSdr(usuario) && noPre(l))));
+const leadsDescartados = () => FUN.leads.filter(l => faseDescartada(l.fase_id) && (gestor() || l.corretor_id === usuario));
 const podeReativar = (l) => gestor() || l.corretor_id === usuario || eSdr(usuario);
 async function carregarDescartados() {
   const ids = leadsDescartados().map(l => l.id), mot = {};
