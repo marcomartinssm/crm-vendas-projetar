@@ -28,7 +28,7 @@ Regras do processo e da gamificação: documento "Processo de Vendas e Gamifica�
 - `crm_vendas_config.sdrs` = ids de corretores que são SDR (vazio até contratar). Botão "Transferir atendimento" aparece para leads de SDR em qualquer etapa em aberto (desde 23/11/2026; não aparece em vendido, perdido ou descartado) e para o gestor. Função `crm_vendas_transferir`; sugestão do agenciador: `crm_vendas_sugerir_corretor`.
 - Ao contratar o SDR: cadastrar como corretor + login (usuarios_corretores), incluir o id em `sdrs` e em `participantes`.
 - Lead criado para corretor inativo vai para a SDR ativa (gatilho `lead_sem_corretor_inativo` → `crm_lead_sem_corretor_inativo`; antes ia para a Pamela).
-- **Editar nome e telefone (só a SDR, desde 23/11/2026):** botão "✎ Editar nome/telefone" no cartão e na tela do lead, nos leads dela e nos da Nutrição. Função `crm_vendas_editar_contato` (bloqueia telefone que já é de outro lead); cada campo alterado grava antes/depois em `crm_vendas_lead_edicoes`, que aparece no histórico do lead. Não conta como contato nem encerra tarefa.
+- **Editar nome e telefone (SDR e gestor, desde 23/11/2026):** botão "✎ Editar nome/telefone" no cartão e na tela do lead. SDR: leads dela e os da Nutrição; gestor (`aprovadores`, não `crm_admins`): qualquer lead. Função `crm_vendas_editar_contato` (bloqueia telefone que já é de outro lead); cada campo alterado grava antes/depois em `crm_vendas_lead_edicoes`, que aparece no histórico do lead. Não conta como contato nem encerra tarefa.
 - SDR atual (22/10/2026): Carolini Labes. Recebeu todos os leads da Pamela e os Hibernados de Meta Ads da Projetar Imóveis (58, registrados em `crm_vendas_movimentos` como `transferencia`).
 
 ## Histórico dos leads
