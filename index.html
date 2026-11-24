@@ -257,7 +257,7 @@
 <header>
   <h1><span class="logo">P</span><span>CRM Vendas<small>Projetar Imóveis</small></span></h1>
   <nav class="abas" id="abas"></nav>
-  <div class="quem" id="quem" hidden><span id="vercomo-box" hidden>Ver como <select id="vercomo"></select></span><span id="quem-nome"></span><button id="sair">Sair</button></div>
+  <div class="quem" id="quem" hidden><span id="vercomo-box" hidden>Ver como <select id="vercomo"></select></span><span id="quem-nome"></span><button id="trocarsenha">Trocar senha</button><button id="sair">Sair</button></div>
 </header>
 <section id="login" hidden>
   <form class="card" id="form-login">
@@ -267,6 +267,7 @@
     <div class="q"><label for="senha">Senha</label><input id="senha" type="password" autocomplete="current-password" required></div>
     <div class="erro" id="erro-login"></div>
     <button class="principal" style="width:100%;padding:10px">Entrar</button>
+    <div style="text-align:center;margin-top:10px"><a href="#" id="esqueci" style="color:var(--azul);font-size:14px">Esqueci minha senha</a></div>
   </form>
 </section>
 <section id="link-entrada" hidden>
@@ -2389,6 +2390,38 @@ $('vercomo').addEventListener('change', async (e) => {
   tela = { nome: VER && FUN.sdrs.includes(VER) ? 'pre' : 'funil' }; render();
 });
 $('sair').addEventListener('click', async () => { await db.auth.signOut(); entrar(null); });
+// ---------- senha: trocar (logado) e "esqueci minha senha" (e-mail com link que volta para cá) ----------
+function abrirModalSenha(recuperando) {
+  const m = document.getElementById('modal');
+  m.innerHTML = `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h2 style="font-size:16px;margin:0">${recuperando ? 'Crie sua nova senha' : 'Trocar senha'}</h2><button data-fecharmodal aria-label="Fechar">✕</button></div>
+    <div style="color:var(--suave);font-size:13px;margin-bottom:12px">Vale também para o CRM Leads e os outros sistemas que usam o mesmo login.</div>
+    <div class="q"><label for="s1">Nova senha (mínimo 6 caracteres)</label><input id="s1" type="password" autocomplete="new-password"></div>
+    <div class="q"><label for="s2">Repita a nova senha</label><input id="s2" type="password" autocomplete="new-password"></div>
+    <div class="erro" id="serro"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button data-fecharmodal>Cancelar</button><button class="principal" id="salvarsenha">Salvar senha</button></div></div>`;
+  m.hidden = false;
+  document.getElementById('s1').focus();
+  document.getElementById('salvarsenha').addEventListener('click', async (e) => {
+    const a = document.getElementById('s1').value, b = document.getElementById('s2').value, er = document.getElementById('serro');
+    if (a.length < 6) { er.textContent = 'A senha precisa ter pelo menos 6 caracteres.'; return; }
+    if (a !== b) { er.textContent = 'As duas senhas não são iguais.'; return; }
+    e.target.disabled = true;
+    const { error } = await db.auth.updateUser({ password: a });
+    e.target.disabled = false;
+    if (error) { er.textContent = /different|same/i.test(error.message) ? 'A nova senha precisa ser diferente da atual.' : 'Não foi possível trocar: ' + error.message; return; }
+    fecharModal(); aviso('Senha trocada. Use a nova senha da próxima vez que entrar.');
+  });
+}
+$('trocarsenha').addEventListener('click', () => abrirModalSenha(false));
+$('esqueci').addEventListener('click', async (e) => {
+  e.preventDefault();
+  const email = $('email').value.trim();
+  if (!email) { $('erro-login').textContent = 'Digite seu e-mail acima e clique de novo em "Esqueci minha senha".'; return; }
+  const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  $('erro-login').textContent = error ? (/rate|seconds/i.test(error.message) ? 'Já enviamos um e-mail há pouco. Espere alguns minutos e tente de novo.' : 'Não foi possível enviar: ' + error.message)
+    : 'Enviamos um link para ' + email + '. Abra o e-mail, clique no link e crie a nova senha (veja também o spam).';
+});
+db.auth.onAuthStateChange((evento) => { if (evento === 'PASSWORD_RECOVERY') setTimeout(() => abrirModalSenha(true), 800); });
 // ---------- link do celular: entra com nome + 4 últimos números (sem senha) ----------
 let LINK = null; // { token, corretor, nome }
 async function abrirLink() {
