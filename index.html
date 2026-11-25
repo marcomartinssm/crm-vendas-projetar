@@ -1916,7 +1916,7 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('[data-copiar], [data-moverrapido], [data-transferir], [data-confirmartransf], [data-editarcontato], [data-salvarcontato], [data-fecharmodal], [data-lead], [data-voltarfunil], [data-novolead], [data-mover], [data-salvarlead]');
   if (!b) return;
   const ds = b.dataset;
-  if (ds.copiar) { navigator.clipboard.writeText(ds.copiar).then(() => aviso('Telefone copiado.'), () => aviso('Não foi possível copiar.', true)); }
+  if (ds.copiar) { navigator.clipboard.writeText(ds.copiar).then(() => aviso(ds.copiarmsg || 'Telefone copiado.'), () => aviso('Não foi possível copiar.', true)); }
   else if (ds.moverrapido) abrirModalMover(ds.moverrapido);
   else if (ds.transferir) abrirModalTransferir(ds.transferir);
   else if (ds.editarcontato) abrirModalContato(ds.editarcontato);
@@ -2318,6 +2318,9 @@ function telaPainel() {
   return `${per}
   ${POSSE.length ? `<button class="aviso" style="display:block;width:100%;text-align:left;border:none;background:var(--vermelho-claro);color:var(--vermelho)" data-aba="aprovacao">🔔 <b>${POSSE.length} imóve${POSSE.length > 1 ? 'is perderam' : 'l perdeu'} a posse (61º dia)</b> e aguarda${POSSE.length > 1 ? 'm' : ''} sua decisão. Clique para ver.</button>` : ''}
   ${DB.imoveis.some(i => i.status === 'aguardando') ? `<button class="aviso" style="display:block;width:100%;text-align:left;border:none;background:var(--azul-claro);color:var(--azul)" data-aba="aprovacao">${DB.imoveis.filter(i => i.status === 'aguardando').length} agenciamento(s) aguardando sua aprovação. Clique para ver.</button>` : ''}
+  ${(() => { const link = location.origin + location.pathname + '#novo'; return `<div class="card" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <span><b style="font-weight:600">📲 Link do agenciamento</b><br><span class="dica">${esc(link)} · o corretor cadastra o imóvel pelo celular, sem senha</span></span>
+    <span style="display:flex;gap:8px"><button data-copiar="${esc(link)}" data-copiarmsg="Link do agenciamento copiado.">Copiar link</button><a href="${esc(link)}" target="_blank" class="principal" style="text-decoration:none;padding:8px 14px;border-radius:10px">Abrir</a></span></div>`; })()}
   <div class="kpis">
     ${kpi('Novos leads', m.novos_leads)}${kpi('Contatos registrados', m.contatos)}${kpi('Visitas realizadas', m.visitas_realizadas, `${m.visitas_agendadas} agendadas · ${m.noshow_cliente + m.noshow_corretor} não compareceram`)}
     ${kpi('Propostas', m.propostas)}${kpi('Vendas', m.vendas, `VGV ${brl(m.vgv)}`)}${kpi('Honorários', brl(m.honorarios))}
