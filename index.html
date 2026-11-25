@@ -944,7 +944,7 @@ function telaDetalhe() {
   if (!im) { tela = { nome: 'lista' }; return telaLista(); }
   const st = STATUS[im.status];
   const at = situacaoAtualizacao(im);
-  const podeEditar = (['rascunho', 'revisao', 'devolvido'].includes(im.status) && (!gestor() ? im.corretor === usuario : im.status === 'revisao' && im.corretor === GESTOR_CORRETOR))
+  const podeEditar = (['rascunho', 'revisao', 'devolvido'].includes(im.status) && (!gestor() ? im.corretor === usuario : im.status === 'revisao'))
     || (gestor() && im.status === 'aguardando');
   const L = (a, b) => vazio(b) || (Array.isArray(b) && !b.length) ? '' : `<div class="linha"><span>${a}</span><span>${esc(Array.isArray(b) ? b.join(', ') : b)}</span></div>`;
   const doc = (n, v, k) => `<div class="linha"><span>${n}</span><span>${v ? `<span class="selo verde">${esc(v)}</span>${im.arqs && im.arqs[k] ? ` <button class="link" data-verarq="${esc(im.arqs[k])}">abrir</button>` : ''}` : '<span class="selo vermelho">Falta</span>'}</span></div>`;
