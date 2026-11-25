@@ -2,9 +2,11 @@
 // A ficha manda o endereço; a função acha o ponto no mapa (1 busca de texto) e procura os lugares mais próximos
 // de cada categoria (12 buscas "perto de"; posto de saúde é por texto). O corretor confere tudo na ficha antes de enviar ao gestor.
 //
-// POST { endereco: { rua, numero, bairro, cidade, uf, cep }, token? }
+// POST { endereco: { rua, numero, bairro, cidade, uf, cep }, ponto?: { lat, lng }, token? }
+//   - ponto: onde o corretor marcou o imóvel no mapa; com ele a busca do endereço é pulada
 //   - corretor logado: manda o login (Authorization: Bearer <jwt>) e precisa participar do CRM Vendas
 //   - link do celular: manda o token da sessão (crm_vendas_link_sessoes, válida por 12 horas)
+// POST { acao: "chave", token? } devolve a chave do mapa da tela (GOOGLE_MAPS_BROWSER_KEY, presa ao endereço do site)
 // Limite: 150 buscas por dia (crm_vendas_google_reservar), para ficar dentro das 5 mil grátis por mês.
 // Segredo usado: GOOGLE_MAPS_KEY (nunca vai para a tela).
 
@@ -86,25 +88,37 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return responder({ erro: "Use POST." }, 405);
   if (!CHAVE) return responder({ erro: "Chave do Google não configurada." }, 500);
 
-  let corpo: { endereco?: Record<string, string>; token?: string };
+  let corpo: { endereco?: Record<string, string>; token?: string; acao?: string; ponto?: { lat: number; lng: number } };
   try { corpo = await req.json(); } catch { return responder({ erro: "Pedido inválido." }, 400); }
   if (!(await autorizado(req, corpo.token))) return responder({ erro: "Entre no CRM de novo para buscar." }, 401);
 
-  const e = corpo.endereco ?? {};
-  if (!e.rua || !e.cidade) return responder({ erro: "Preencha rua e cidade na primeira etapa." }, 400);
+  if (corpo.acao === "chave") {
+    const chaveMapa = (Deno.env.get("GOOGLE_MAPS_BROWSER_KEY") ?? "").trim();
+    return chaveMapa ? responder({ ok: true, chave: chaveMapa }) : responder({ erro: "O mapa ainda não foi ligado." }, 404);
+  }
 
-  const { data: ok, error } = await db.rpc("crm_vendas_google_reservar", { p_n: BUSCAS });
+  const e = corpo.endereco ?? {};
+  const pt = corpo.ponto;
+  const temPonto = !!pt && Number.isFinite(Number(pt.lat)) && Number.isFinite(Number(pt.lng)) && Math.abs(Number(pt.lat)) <= 90 && Math.abs(Number(pt.lng)) <= 180;
+  if (!temPonto && (!e.rua || !e.cidade)) return responder({ erro: "Preencha rua e cidade na primeira etapa." }, 400);
+
+  const { data: ok, error } = await db.rpc("crm_vendas_google_reservar", { p_n: temPonto ? BUSCAS - 1 : BUSCAS });
   if (error) return responder({ erro: "Não foi possível buscar agora. Tente de novo." }, 500);
   if (!ok) return responder({ erro: "O limite de buscas de hoje acabou. Tente amanhã ou preencha à mão." }, 429);
 
   try {
-    // 1) Ponto do imóvel no mapa
-    const texto = `${e.rua}${e.numero ? ", " + e.numero : ""}${e.bairro ? " - " + e.bairro : ""}, ${e.cidade}${e.uf ? " - " + e.uf : ""}${e.cep ? ", " + e.cep : ""}, Brasil`;
-    const g = await google("places:searchText", "places.location,places.formattedAddress",
-      { textQuery: texto, languageCode: "pt-BR", regionCode: "BR", pageSize: 1 });
-    const p = g.places?.[0];
-    if (!p?.location) return responder({ erro: "O Google não achou esse endereço. Confira rua, número e cidade." }, 404);
-    const centro = { lat: p.location.latitude, lng: p.location.longitude };
+    // 1) Ponto do imóvel no mapa: o que o corretor marcou ou, sem ele, o endereço buscado no Google
+    let centro: { lat: number; lng: number }, enderecoGoogle: string;
+    if (temPonto) {
+      centro = { lat: Number(pt!.lat), lng: Number(pt!.lng) }; enderecoGoogle = "ponto marcado no mapa";
+    } else {
+      const texto = `${e.rua}${e.numero ? ", " + e.numero : ""}${e.bairro ? " - " + e.bairro : ""}, ${e.cidade}${e.uf ? " - " + e.uf : ""}${e.cep ? ", " + e.cep : ""}, Brasil`;
+      const g = await google("places:searchText", "places.location,places.formattedAddress",
+        { textQuery: texto, languageCode: "pt-BR", regionCode: "BR", pageSize: 1 });
+      const p = g.places?.[0];
+      if (!p?.location) return responder({ erro: "O Google não achou esse endereço. Confira rua, número e cidade." }, 404);
+      centro = { lat: p.location.latitude, lng: p.location.longitude }; enderecoGoogle = p.formattedAddress;
+    }
 
     // 2) Lugares perto, do mais próximo para o mais longe; fechados de vez ficam de fora
     // Uma categoria com problema não derruba as outras: ela volta vazia e o corretor preenche à mão.
@@ -142,7 +156,7 @@ Deno.serve(async (req) => {
     cats.saude = saude.filter((x) => !vs.has(x.id) && vs.add(x.id)).sort((a, b) => (SAUDE_BOA.test(b.nome) ? 1 : 0) - (SAUDE_BOA.test(a.nome) ? 1 : 0) || a.m - b.m);
     delete cats.hospital;
     for (const k of Object.keys(cats)) cats[k] = cats[k].slice(0, 3);
-    return responder({ ok: true, endereco_google: p.formattedAddress, lat: centro.lat, lng: centro.lng, cats, falhas, quando: new Date().toISOString() });
+    return responder({ ok: true, endereco_google: enderecoGoogle, lat: centro.lat, lng: centro.lng, cats, falhas, quando: new Date().toISOString() });
   } catch (err) {
     return responder({ erro: "O Google não respondeu. Tente de novo.", detalhe: String((err as Error).message ?? err) }, 502);
   }

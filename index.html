@@ -210,6 +210,7 @@
   .ktransf { margin-top: 5px; color: var(--azul); background: var(--azul-claro); border-color: transparent; }
   .ktransf:hover { border-color: var(--azul); }
   #modal { position: fixed; inset: 0; background: rgba(10,12,16,.55); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 20; }
+  #modal .card.card-mapa { max-width: 760px; }
   #modal .card { width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; box-shadow: var(--sombra-alta); padding: 22px; border-radius: 18px; }
   .kcard .s { font-size: 12px; color: var(--suave); }
   .gchk { border-collapse: collapse; font-size: 12px; min-width: 100%; }
@@ -638,6 +639,9 @@ function corpoPasso() {
     <div class="grade">${campo('bairro', 'Bairro', 'Centro')}${campo('cidade', 'Cidade', 'Araranguá')}${campo('uf', 'UF', 'SC')}</div>
     ${t === 'apto' || t === 'sala' ? campo('predio', 'Nome do edifício ou condomínio', 'Edifício Solar') : ''}
     ${campo('ref', 'Pontos de referência e melhor acesso', 'Atrás da praça central, acesso pela Av. Getúlio Vargas')}
+    <div class="q"><label>Localização no mapa</label>
+      ${F.mapa ? `<div class="aviso" style="background:var(--verde-claro);color:var(--verde);margin-bottom:8px">✓ Imóvel marcado no mapa · <a href="https://maps.google.com/?q=${F.mapa.lat},${F.mapa.lng}" target="_blank" style="color:inherit">conferir no Google Maps</a></div>` : '<div class="dica" style="margin-bottom:6px">Marque no mapa onde fica o imóvel. É desse ponto que o sistema procura o que tem perto (etapa 8).</div>'}
+      <button type="button" data-mapa style="width:100%">📍 ${F.mapa ? 'Mudar o ponto no mapa' : 'Marcar no mapa'}</button></div>
     ${campo('codigo_imoview', 'Código do imóvel no Imoview', '4521', 'text', 'Se o imóvel já está no Imoview, coloque o código para a gente comparar. O código do CRM é criado sozinho.')}`;
   if (passo === 1) return `
     ${campo('venda', 'Valor de venda (R$)', '450000', 'number')}
@@ -751,6 +755,9 @@ const FIXOS_ARARANGUA = [
 ];
 const distM = (a, b) => { const r = Math.PI / 180, h = Math.sin((b[0] - a[0]) * r / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin((b[1] - a[1]) * r / 2) ** 2; return Math.round(12742000 * Math.asin(Math.sqrt(h))); };
 const distTxt = (m) => m == null ? '' : m < 1000 ? `${Math.max(50, Math.round(m / 50) * 50)} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`;
+const pontoPerto = (d) => d.mapa ? `${d.mapa.lat},${d.mapa.lng}` : '';
+// A busca ficou velha se o ponto do mapa mudou (ou, sem ponto, se o endereço mudou).
+const pertoMudou = (d) => { const b = d.perto_busca; return !!b && (d.mapa ? (b.ponto || '') !== pontoPerto(d) : !!b.endereco && b.endereco !== enderecoPerto(d)); };
 const enderecoPerto = (d) => [d.rua, d.numero, d.bairro, d.cidade, d.uf].map(x => String(x || '').trim().toLowerCase()).join('|');
 const semAcento = (x) => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 function fixosPerto(d) {
@@ -784,14 +791,14 @@ function corpoPerto() {
   // Rascunho com busca de mais de 25 dias: descarta (regra dos 30 dias do Google) e pede nova busca.
   if (F.perto_busca?.cats && (Date.now() - new Date(F.perto_busca.quando)) / 86400000 > 25) { F.perto_busca = null; F.perto_conf = {}; F.perto_ok = ''; }
   const b = F.perto_busca, cats = b?.cats;
-  const mudou = b && b.endereco && b.endereco !== enderecoPerto(F);
+  const mudou = pertoMudou(F);
   if (!cats) {
     const feito = F.perto_ok && (F.proximidades || []).length;
     return `
       <div class="dica" style="margin-bottom:10px">O sistema procura no Google Maps o que tem perto do imóvel (mercado, escola, farmácia…). Depois você confere se cada lugar <b>ainda existe</b>. Só entra no anúncio o que você confirmar.</div>
       ${feito ? `<div class="aviso" style="background:var(--verde-claro);color:var(--verde)">Conferido em ${new Date(F.perto_ok + 'T12:00').toLocaleDateString('pt-BR')}: ${esc(F.proximidades.map(x => x.nome).join(' · '))}</div>` : ''}
       <button class="principal" type="button" data-pbuscar>${feito ? 'Buscar e conferir de novo' : 'Buscar no Google Maps'}</button>
-      <div class="dica" style="margin-top:6px">Usa o endereço da etapa 1: ${esc([F.rua, F.numero, F.bairro, F.cidade].filter(Boolean).join(', ') || 'preencha o endereço primeiro')}.</div>`;
+      <div class="dica" style="margin-top:6px">${F.mapa ? 'Usa o ponto marcado no mapa na etapa 1.' : `Usa o endereço da etapa 1: ${esc([F.rua, F.numero, F.bairro, F.cidade].filter(Boolean).join(', ') || 'preencha o endereço primeiro')}.`}</div>`;
   }
   const conf = F.perto_conf || {};
   const cartao = ([k, rot]) => {
@@ -811,7 +818,7 @@ function corpoPerto() {
   const fixos = fixosPerto(F);
   const faltam = pertoFaltam(F);
   return `
-    ${mudou ? '<div class="aviso" style="background:var(--ambar-claro);color:var(--ambar)">O endereço mudou depois da busca. <button type="button" data-pbuscar>Buscar de novo</button></div>' : ''}
+    ${mudou ? '<div class="aviso" style="background:var(--ambar-claro);color:var(--ambar)">O endereço ou o ponto no mapa mudou depois da busca. <button type="button" data-pbuscar>Buscar de novo</button></div>' : ''}
     <div class="dica">Confira cada lugar. Só entra no anúncio o que você confirmar. Distâncias em linha reta a partir de: ${esc(b.endereco_google || '')}</div>
     ${PERTO_CATS.map(([g, its]) => `<div class="perto-grupo">${g}</div>${its.map(cartao).join('')}`).join('')}
     ${fixos.length ? `<div class="perto-grupo">Pontos fixos da cidade</div><div class="perto-item">${fixos.map(f => `<div class="linha"><span>${esc(f.nome)}</span><span>${distTxt(f.m)}</span></div>`).join('')}<div class="dica" style="margin-top:4px">Calculados pelo sistema, sem conferência.</div></div>` : ''}
@@ -822,25 +829,84 @@ async function buscarPerto(bt) {
   const erro = document.getElementById('erro');
   if (!F.rua || !F.cidade) { erro.textContent = 'Preencha o endereço na etapa 1 antes de buscar.'; return; }
   if (bt) { bt.disabled = true; bt.textContent = 'Buscando no Google Maps…'; }
+  // Com o mapa ligado, o ponto marcado é obrigatório: o endereço digitado às vezes cai na rua errada.
+  if (!F.mapa && await chaveMapa()) { if (bt) { bt.disabled = false; bt.textContent = 'Buscar no Google Maps'; } erro.textContent = 'Marque o imóvel no mapa (etapa 1, "Marcar no mapa") antes de buscar.'; return; }
   erro.textContent = '';
   const { data, error } = await db.functions.invoke('crm-vendas-proximidades', {
-    body: { token: LINK?.token, endereco: { rua: F.rua, numero: F.numero, bairro: F.bairro, cidade: F.cidade, uf: F.uf, cep: F.cep } },
+    body: { token: LINK?.token, ponto: F.mapa || null, endereco: { rua: F.rua, numero: F.numero, bairro: F.bairro, cidade: F.cidade, uf: F.uf, cep: F.cep } },
   });
   let res = data;
   if (error && error.context?.json) { try { res = await error.context.json(); } catch {} }
   if (!res?.ok) { if (bt) { bt.disabled = false; bt.textContent = 'Buscar no Google Maps'; } erro.textContent = res?.erro || 'Não foi possível buscar agora. Tente de novo.'; return; }
-  F.perto_busca = { cats: res.cats, lat: res.lat, lng: res.lng, endereco_google: res.endereco_google, quando: res.quando, endereco: enderecoPerto(F) };
+  F.perto_busca = { cats: res.cats, lat: res.lat, lng: res.lng, endereco_google: res.endereco_google, quando: res.quando, endereco: enderecoPerto(F), ponto: pontoPerto(F) };
   F.perto_conf = {}; F.perto_ok = '';
   pertoAtualizar();
   if (tela.nome === 'form' && passo === 7) { document.getElementById('corpo').innerHTML = corpoPerto(); atualizarPlacar(); }
   if (LINK && F.tipo) gravarLink(false);
 }
+// ---------- marcar o imóvel no mapa (Google Maps) ----------
+// A chave do mapa da tela vem da função crm-vendas-proximidades (segredo GOOGLE_MAPS_BROWSER_KEY, presa ao endereço do site).
+// O ponto é escolhido pelo corretor, então fica guardado na ficha (F.mapa).
+let MAPA_CHAVE, mapsPromessa, MAPA_MARC;
+const ARARANGUA = { lat: -28.9356, lng: -49.4859 };
+async function chaveMapa() {
+  if (MAPA_CHAVE !== undefined) return MAPA_CHAVE;
+  const { data, error } = await db.functions.invoke('crm-vendas-proximidades', { body: { acao: 'chave', token: LINK?.token } });
+  let res = data;
+  if (error && error.context?.json) { try { res = await error.context.json(); } catch {} }
+  if (res?.chave || error?.context?.status === 404) MAPA_CHAVE = res?.chave || null; // erro de rede: tenta de novo depois
+  return res?.chave || null;
+}
+function carregarMaps(chave) {
+  if (window.google?.maps?.Map) return Promise.resolve();
+  return mapsPromessa ||= new Promise((ok, falha) => {
+    window.__mapsOk = ok;
+    window.gm_authFailure = () => { aviso('O Google recusou a chave do mapa. Avise o gestor.', true); fecharModal(); };
+    const s = document.createElement('script');
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(chave)}&v=weekly&language=pt-BR&region=BR&callback=__mapsOk`;
+    s.async = true; s.onerror = () => { mapsPromessa = null; s.remove(); falha(); };
+    document.head.appendChild(s);
+  });
+}
+async function abrirMapa(bt) {
+  const txt = bt?.textContent;
+  if (bt) { bt.disabled = true; bt.textContent = 'Abrindo o mapa…'; }
+  const volta = () => { if (bt) { bt.disabled = false; bt.textContent = txt; } };
+  const chave = await chaveMapa();
+  if (!chave) { volta(); aviso('O mapa ainda não foi ligado (falta a chave do Google).', true); return; }
+  try { await carregarMaps(chave); } catch { volta(); aviso('Não foi possível abrir o mapa. Confira a internet e tente de novo.', true); return; }
+  volta();
+  const m = document.getElementById('modal');
+  m.innerHTML = `<div class="card card-mapa"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h2 style="font-size:16px;margin:0">Onde fica o imóvel?</h2><button data-fecharmodal aria-label="Fechar">✕</button></div>
+    <div class="dica" style="margin-bottom:8px">Toque no mapa ou arraste o marcador até o imóvel. A vista de satélite ajuda a achar o telhado certo.</div>
+    <div id="mapa" style="height:60vh;min-height:300px;border-radius:12px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button data-fecharmodal>Cancelar</button><button class="principal" data-mapaok>Confirmar o local</button></div></div>`;
+  m.hidden = false;
+  const ini = F.mapa || null;
+  const mapa = new google.maps.Map(document.getElementById('mapa'), { center: ini || ARARANGUA, zoom: ini ? 19 : 14, mapTypeId: 'hybrid', streetViewControl: false, fullscreenControl: false, clickableIcons: false, gestureHandling: 'greedy' });
+  MAPA_MARC = new google.maps.Marker({ map: mapa, position: ini || ARARANGUA, draggable: true });
+  mapa.addListener('click', ev => MAPA_MARC.setPosition(ev.latLng));
+  if (!ini && F.rua) new google.maps.Geocoder().geocode({ address: `${F.rua}${F.numero ? ', ' + F.numero : ''}${F.bairro ? ' - ' + F.bairro : ''}, ${F.cidade || 'Araranguá'}${F.uf ? ' - ' + F.uf : ''}${F.cep ? ', ' + F.cep : ''}, Brasil`, region: 'br' }, (r, st) => {
+    if (st !== 'OK' || !r?.[0]) return;
+    const p = r[0].geometry.location; mapa.setCenter(p); mapa.setZoom(18); MAPA_MARC.setPosition(p);
+  });
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-mapa], [data-mapaok]'); if (!b || !F) return;
+  if (b.dataset.mapa !== undefined) { abrirMapa(b); return; }
+  const p = MAPA_MARC?.getPosition(); if (!p) return;
+  F.mapa = { lat: +p.lat().toFixed(6), lng: +p.lng().toFixed(6) };
+  fecharModal(); render();
+  if (LINK && F.tipo) gravarLink(false);
+  aviso('Local marcado no mapa.');
+});
+
 // Ao enviar, guarda só o que o corretor confirmou. Regra do Google: a lista de candidatos e as coordenadas
 // não podem ficar guardadas (coordenadas no máximo 30 dias), então somem aqui.
 function pertoLimparParaEnviar() {
   if (!F.perto_busca?.cats) return;
   pertoAtualizar();
-  F.perto_busca = { quando: F.perto_busca.quando, endereco: F.perto_busca.endereco };
+  F.perto_busca = { quando: F.perto_busca.quando, endereco: F.perto_busca.endereco, ponto: F.perto_busca.ponto };
   delete F.perto_conf;
 }
 document.addEventListener('click', e => {
@@ -1157,7 +1223,7 @@ document.addEventListener('click', e => {
     }
     const { completo, linhas } = pontuar(F);
     const semDono = !String(F.prop_nome).trim() || String(F.prop_tel).replace(/\D/g, '').length < 10;
-    const semPerto = !F.perto_ok || (F.perto_busca?.endereco && F.perto_busca.endereco !== enderecoPerto(F)); // endereço mudou depois da conferência
+    const semPerto = !F.perto_ok || pertoMudou(F); // endereço ou ponto do mapa mudou depois da conferência
     if (!completo || !F.mat_num || semDono || semPerto) {
       const faltam = (F.mat_num ? [] : ['número da matrícula']).concat(semDono ? ['nome e celular do proprietário'] : []).concat(semPerto ? ['conferir o que tem perto (última etapa)'] : []).concat(linhas.filter(l => l.o && !l.ok).map(l => l.l.toLowerCase()));
       document.getElementById('erro').textContent = 'Para enviar, falta: ' + faltam.join(', ') + '.';
