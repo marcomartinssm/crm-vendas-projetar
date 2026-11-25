@@ -401,9 +401,10 @@ function paraLinha(im) {
   for (const [k, v] of Object.entries(im)) if (!FORA_DE_DADOS.includes(k)) dados[k] = v;
   return { id: im.id, corretor_id: im.corretor, status: im.status, tipo: im.tipo || null, codigo_imoview: String(im.codigo_imoview || '').trim() || null, dados, nota: pontuar(im).total };
 }
-let POSSE = [];
+let POSSE = [], CONF = [];
 async function carregar() {
   if (souAprovador && !VER) { const { data: pp } = await db.rpc('crm_vendas_pedidos_posse'); POSSE = pp || []; } else POSSE = [];
+  if (souAprovador && !VER) { const { data: cf } = await db.from('crm_vendas_atividades').select('*').in('tipo', ['visita_prospeccao', 'visita_planta']).is('conferida_em', null).is('anulada_em', null).order('quando'); CONF = cf || []; } else CONF = [];
   const { data, error } = await db.from('crm_vendas_imoveis').select('*').order('criado_em', { ascending: false });
   if (error) { aviso('Não foi possível carregar os imóveis. Tente de novo.', true); return; }
   DB.imoveis = data.map(deLinha).filter(im => !VER || im.corretor === VER);
@@ -432,7 +433,7 @@ function render() {
   const abas = gestor() ? [['painel', 'Painel']] : [];
   if (veEntrada()) abas.push(['entrada', ENT.lista.length ? `Entrada (${ENT.lista.length})` : 'Entrada']);
   abas.push(['fila', 'Fila do dia'], ['pre', 'Pré-atendimento'], ['funil', 'Funil de vendas'], ['nut', 'Nutrição'], ['desc', 'Descartados'], ['lista', 'Imóveis'], ['ativ', 'Atividades'], ['pontos', 'Pontuação'], ['comissao', 'Comissão']);
-  if (gestor()) { const n = DB.imoveis.filter(i => i.status === 'aguardando').length + POSSE.length; abas.push(['aprovacao', n ? `Aprovação 🔔 ${n}` : 'Aprovação (0)']); }
+  if (gestor()) { const n = DB.imoveis.filter(i => i.status === 'aguardando').length + POSSE.length + CONF.length; abas.push(['aprovacao', n ? `Aprovação 🔔 ${n}` : 'Aprovação (0)']); }
   const leadAberto = tela.nome === 'lead' ? FUN.leads.find(x => x.id === tela.id) : null;
   const atual = leadAberto ? (tela.de || abaDoLead(leadAberto))
     : ['painel', 'comissao', 'pontos', 'ativ', 'pre', 'fila', 'nut', 'desc', 'entrada', 'aprovacao'].includes(tela.nome) ? tela.nome
@@ -533,9 +534,41 @@ function telaAprovacao() {
         <div class="grade" style="margin-top:8px"><select id="pp_para_${p.id}"><option value="">Novo corretor</option>${CORRETORES_ATIVOS.filter(c => c.id !== p.de_corretor && !eSdr(c.id)).map(c => `<option value="${c.id}" ${c.id === p.sugerido ? 'selected' : ''}>${esc(c.nome)}${c.id === p.sugerido ? ' (sugerido: menos imóveis)' : ''}</option>`).join('')}</select>
         <input id="pp_obs_${p.id}" placeholder="Observação (opcional)"></div></span>
       <span style="display:flex;gap:6px;flex-wrap:wrap"><button class="principal" data-posse="${p.id}" data-acao="transferir">Transferir</button><button data-posse="${p.id}" data-acao="manter">Manter com ${esc(p.de_nome)}</button></span></div>`).join('')}</div>` : '';
-  return `${posse}<p style="color:var(--suave);margin-top:0">Agenciamentos enviados pelos corretores. Só contam na meta e pontuam depois que você aprova.</p>
+  const conf = CONF.length ? `<div class="card" style="margin-bottom:16px"><h2 style="font-size:16px;margin:0 0 4px">Visitas para conferir</h2>
+    <div class="dica" style="margin-bottom:8px">Abra a foto e o mapa. Se a visita não aconteceu de verdade, anule: ela deixa de contar nas metas e nos pontos.</div>
+    ${CONF.map(a => `<div class="lin" style="align-items:flex-start"><span style="flex:1;min-width:220px"><b style="font-weight:600">${esc(CORRETORES[a.corretor_id] || 'Corretor')} · ${esc(TIPOS_ATIV[a.tipo])}</b><br>
+        <span class="dica">${new Date(a.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} · ${esc(a.descricao || '')}${a.precisao ? ` · precisão ${Math.round(a.precisao)} m` : ''}</span><br>
+        <button class="link" data-verarq="${esc(a.foto_path)}">ver foto</button> · <a href="https://maps.google.com/?q=${a.lat},${a.lng}" target="_blank" style="color:var(--azul);font-size:13px">ver no mapa</a></span>
+      <span style="display:flex;gap:6px;flex-wrap:wrap"><button class="principal" data-confativ="${a.id}">✓ Conferida</button><button data-anularativ="${a.id}">Anular</button></span></div>`).join('')}</div>` : '';
+  return `${posse}${conf}<p style="color:var(--suave);margin-top:0">Agenciamentos enviados pelos corretores. Só contam na meta e pontuam depois que você aprova.</p>
     <div class="lista">${fila.map(cartao).join('') || '<div class="vazio">Nada esperando aprovação.</div>'}</div>`;
 }
+
+// Conferência das atividades pelo gestor (conferir / anular com motivo / desfazer).
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-confativ], [data-anularativ], [data-desanular], [data-salvaranular]'); if (!b) return;
+  const ds = b.dataset;
+  if (ds.anularativ) {
+    const m = document.getElementById('modal');
+    m.innerHTML = `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="font-size:16px;margin:0">Anular atividade</h2><button data-fecharmodal aria-label="Fechar">✕</button></div>
+      <div class="dica" style="margin-bottom:8px">Ela deixa de contar nas metas e nos pontos. O corretor vê o motivo.</div>
+      <div class="q"><label for="an_motivo">Motivo *</label><textarea id="an_motivo" rows="3" placeholder="Ex.: a foto não é do local informado"></textarea></div>
+      <div class="erro" id="an_erro"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button data-fecharmodal>Cancelar</button><button class="principal" data-salvaranular="${ds.anularativ}">Anular</button></div></div>`;
+    m.hidden = false; return;
+  }
+  const id = +(ds.confativ || ds.desanular || ds.salvaranular);
+  const acao = ds.confativ ? 'ok' : ds.desanular ? 'desfazer' : 'anular';
+  const motivo = acao === 'anular' ? document.getElementById('an_motivo').value.trim() : null;
+  if (acao === 'anular' && !motivo) { document.getElementById('an_erro').textContent = 'Escreva o motivo.'; return; }
+  b.disabled = true;
+  const { error } = await db.rpc('crm_vendas_conferir_atividade', { p_id: id, p_acao: acao, p_motivo: motivo });
+  b.disabled = false;
+  if (error) { aviso(error.message, true); return; }
+  document.getElementById('modal').hidden = true;
+  aviso(acao === 'ok' ? 'Visita conferida.' : acao === 'anular' ? 'Atividade anulada.' : 'Anulação desfeita.');
+  await carregar(); ATV.carregado = false; PTS.carregado = false; render();
+});
 
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-posse]'); if (!b) return;
@@ -1929,6 +1962,9 @@ async function carregarAtividades() {
   }
   if (tela.nome === 'ativ') render();
 }
+// Visitas só pelo celular: câmera na hora + GPS preciso.
+const CELULAR = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+const SO_CELULAR = '<div class="aviso" style="background:var(--ambar-claro);color:var(--ambar)">📱 Visitas só podem ser registradas pelo <b>celular</b>, no local: abra o CRM Vendas no celular, tire a foto na hora e marque a localização.</div>';
 const TIPOS_ATIV = { visita_prospeccao: 'Visita de prospecção', visita_planta: 'Visita a imóvel na planta', post_instagram: 'Post no Instagram', avaliacao_google: 'Avaliação no Google', pos_venda: 'Contato de pós-venda' };
 function linhaMeta(nome, feito, meta, pts, auto, ok, extra) {
   const pc = meta ? Math.min(100, Math.round(feito / meta * 100)) : (ok ? 100 : 0);
@@ -2004,11 +2040,11 @@ function telaAtividades() {
     linhaMeta('Reunião comercial semanal', 0, 0, '10 pontos · presença marcada pelo gestor', true, m.reuniao === true, m.reuniao === true ? 'presente' : m.reuniao === false ? 'faltou' : 'a marcar'),
   ].join('');
   const forms = {
-    visita_prospeccao: `<div class="q"><label>Foto no local *</label><input type="file" id="af_foto" accept="image/*" capture="environment"></div>
+    visita_prospeccao: !CELULAR ? SO_CELULAR : `<div class="q"><label>Tire a foto no local *</label><input type="file" id="af_foto" accept="image/*" capture="environment"></div>
       <div class="q"><label>Check-in *</label><button type="button" data-checkin style="width:100%">📍 Marcar minha localização agora</button><div class="dica" id="af_geo">${ATV.geo ? 'Localização marcada.' : ''}</div></div>
       <div class="q"><label>Onde e com quem *</label><input id="af_desc" placeholder="Condomínio Jardim do Sol, conversei com o síndico"></div>`,
-    visita_planta: `<div class="q"><label>Empreendimento *</label><input id="af_desc" placeholder="Residencial Vista Mar"></div>
-      <div class="q"><label>Foto no empreendimento *</label><input type="file" id="af_foto" accept="image/*" capture="environment"></div>
+    visita_planta: !CELULAR ? SO_CELULAR : `<div class="q"><label>Empreendimento *</label><input id="af_desc" placeholder="Residencial Vista Mar"></div>
+      <div class="q"><label>Tire a foto no empreendimento *</label><input type="file" id="af_foto" accept="image/*" capture="environment"></div>
       <div class="q"><label>Check-in *</label><button type="button" data-checkin style="width:100%">📍 Marcar minha localização agora</button><div class="dica" id="af_geo">${ATV.geo ? 'Localização marcada.' : ''}</div></div>`,
     post_instagram: `<div class="q"><label>Link do post *</label><input id="af_link" placeholder="https://www.instagram.com/p/..."></div>
       <div class="q"><label>Tipo *</label><select id="af_sub"><option value="video">Vídeo / reels</option><option value="estatico">Estático</option></select></div>`,
@@ -2028,13 +2064,14 @@ function telaAtividades() {
     <div>
       ${`<div class="card"><h2 style="font-size:16px;margin:0 0 4px">Registrar atividade</h2>${gestor() ? `<div class="dica" style="margin-bottom:10px">Lançando para <b>${esc(CORRETORES[ATV.corretor] || '')}</b> (troque no seletor acima). Fica marcado como lançado por você.</div>` : '<div style="margin-bottom:10px"></div>'}
         <div class="ativbtns">${['visita_prospeccao', 'visita_planta', 'post_instagram', 'avaliacao_google'].map(t => `<button data-ativform="${t}" class="${ATV.form === t ? 'on' : ''}">${{ visita_prospeccao: '📍 Visita de prospecção', visita_planta: '🏗 Imóvel na planta', post_instagram: '▶ Post no Instagram', avaliacao_google: '★ Avaliação no Google' }[t]}</button>`).join('')}</div>
-        ${ATV.form ? `<div style="margin-top:12px">${forms[ATV.form]}<div class="erro" id="af_erro"></div><button class="principal" data-salvarativ style="width:100%">Registrar</button></div>` : ''}</div>`}
+        ${ATV.form ? `<div style="margin-top:12px">${forms[ATV.form]}${forms[ATV.form] === SO_CELULAR ? '' : '<div class="erro" id="af_erro"></div><button class="principal" data-salvarativ style="width:100%">Registrar</button>'}</div>` : ''}</div>`}
       <div class="card" style="margin-top:12px"><h2 style="font-size:16px;margin:0 0 6px">Pós-venda a fazer</h2>
         ${pend.map(p => `<div class="lin"><span>${esc(p.nome || 'Cliente')} · ${p.marco} dias da venda<br><span class="dica">${new Date(p.vence_em) < new Date() ? '<span style="color:var(--vermelho)">venceu em ' : 'vence em '}${new Date(p.vence_em).toLocaleDateString('pt-BR')}${new Date(p.vence_em) < new Date() ? '</span>' : ''}</span></span>${`<button data-posvenda="${p.lead_id}" data-marco="${p.marco}" data-nome="${esc(p.nome || '')}">Registrar contato</button>`}</div>`).join('') || '<div class="dica">Nada pendente. Os lembretes aparecem sozinhos 30 e 90 dias depois de cada venda.</div>'}</div>
       ${reuniao}
       <div class="card" style="margin-top:12px"><h2 style="font-size:16px;margin:0 0 6px">Atividades registradas</h2>
-        ${ATV.lista.map(a => `<div class="lin"><span>${esc(TIPOS_ATIV[a.tipo] || a.tipo)}${a.subtipo ? ' · ' + (a.subtipo === 'video' ? 'vídeo' : 'estático') : ''}<br><span class="dica">${new Date(a.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}${a.descricao ? ' · ' + esc(a.descricao) : ''}${a.lat ? ` · <a href="https://maps.google.com/?q=${a.lat},${a.lng}" target="_blank" style="color:var(--azul)">ver no mapa</a>` : ''}</span></span>
-          <span>${a.foto_path ? `<button class="link" data-verarq="${esc(a.foto_path)}">foto</button>` : ''}${a.link ? `<a href="${esc(a.link)}" target="_blank" style="color:var(--azul);font-size:13px">link</a>` : ''}</span></div>`).join('') || '<div class="dica">Nenhuma atividade registrada ainda.</div>'}</div>
+        ${ATV.lista.map(a => `<div class="lin"${a.anulada_em ? ' style="opacity:.75"' : ''}><span${a.anulada_em ? ' style="text-decoration:line-through"' : ''}>${esc(TIPOS_ATIV[a.tipo] || a.tipo)}${a.subtipo ? ' · ' + (a.subtipo === 'video' ? 'vídeo' : 'estático') : ''}<br><span class="dica">${new Date(a.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}${a.descricao ? ' · ' + esc(a.descricao) : ''}${a.lat ? ` · <a href="https://maps.google.com/?q=${a.lat},${a.lng}" target="_blank" style="color:var(--azul)">ver no mapa</a>` : ''}</span></span>
+          ${a.anulada_em ? `<br><span class="dica" style="color:var(--vermelho);display:inline-block">Anulada pelo gestor: ${esc(a.anulada_motivo || '')} · não conta pontos</span>` : a.conferida_em ? '<br><span class="dica" style="color:var(--verde);display:inline-block">✓ Conferida pelo gestor</span>' : ''}
+          <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${a.foto_path ? `<button class="link" data-verarq="${esc(a.foto_path)}">foto</button>` : ''}${a.link ? `<a href="${esc(a.link)}" target="_blank" style="color:var(--azul);font-size:13px">link</a>` : ''}${souAprovador ? (a.anulada_em ? `<button class="link" data-desanular="${a.id}">desfazer anulação</button>` : `<button class="link" data-anularativ="${a.id}" style="color:var(--vermelho)">anular</button>`) : ''}</span></div>`).join('') || '<div class="dica">Nenhuma atividade registrada ainda.</div>'}</div>
     </div>
   </div>`;
 }
@@ -2084,14 +2121,16 @@ document.addEventListener('click', async e => {
     const info = document.getElementById('af_geo');
     if (!navigator.geolocation) { info.textContent = 'Este aparelho não informa a localização.'; return; }
     info.textContent = 'Buscando sua localização…';
-    navigator.geolocation.getCurrentPosition(p => { ATV.geo = { lat: p.coords.latitude, lng: p.coords.longitude, precisao: p.coords.accuracy }; info.textContent = `Localização marcada (precisão de ${Math.round(p.coords.accuracy)} m).`; },
-      () => { info.textContent = 'Não foi possível pegar a localização. Libere o acesso à localização no navegador.'; }, { enableHighAccuracy: true, timeout: 15000 });
+    navigator.geolocation.getCurrentPosition(p => {
+        if (p.coords.accuracy > 100) { ATV.geo = null; info.textContent = `A localização veio imprecisa (${Math.round(p.coords.accuracy)} m). Ligue o GPS do celular, vá para um lugar aberto e toque de novo.`; return; }
+        ATV.geo = { lat: p.coords.latitude, lng: p.coords.longitude, precisao: p.coords.accuracy }; info.textContent = `Localização marcada (precisão de ${Math.round(p.coords.accuracy)} m).`; },
+      () => { info.textContent = 'Não foi possível pegar a localização. Libere o acesso à localização no navegador.'; }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
   }
   else if (ds.salvarativ !== undefined) {
     const er = document.getElementById('af_erro'), t = ATV.form;
     const v = (id) => document.getElementById(id)?.value.trim() || '';
     const foto = document.getElementById('af_foto')?.files[0];
-    if ((t === 'visita_prospeccao' || t === 'visita_planta') && (!foto || !ATV.geo || !v('af_desc'))) { er.textContent = !foto ? 'Tire ou anexe a foto.' : !ATV.geo ? 'Marque o check-in no local.' : 'Preencha a descrição.'; return; }
+    if ((t === 'visita_prospeccao' || t === 'visita_planta') && (!foto || !ATV.geo || !v('af_desc'))) { er.textContent = !foto ? 'Tire a foto.' : !ATV.geo ? 'Marque o check-in no local.' : 'Preencha a descrição.'; return; }
     if ((t === 'post_instagram' || t === 'avaliacao_google') && !v('af_link')) { er.textContent = 'Cole o link.'; return; }
     if (t === 'avaliacao_google' && !v('af_lead')) { er.textContent = 'Escolha o cliente da venda.'; return; }
     b.disabled = true; er.style.color = 'var(--suave)'; er.textContent = 'Salvando…';
