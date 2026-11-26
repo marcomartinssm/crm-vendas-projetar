@@ -68,12 +68,13 @@ function ddmm(dt: Date) {
   return `${String(t.getUTCDate()).padStart(2, "0")}/${String(t.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-// dia = hoje; semana = sábado a sexta (enviado no sábado); mês = mês passado.
+// dia = ontem, das 00:00 às 23:59 (enviado às 9h do dia seguinte); semana = sábado a sexta (enviado no sábado); mês = mês passado.
 function periodo(tipo: TipoRelatorio) {
   const h = hojeBR();
   if (tipo === "dia") {
-    const inicio = meiaNoiteBR(h.a, h.m, h.d);
-    return { inicio, fim: meiaNoiteBR(h.a, h.m, h.d + 1), titulo: "Relatório diário", rotulo: `${DIAS[h.dow]}, ${ddmm(inicio)}/${h.a}` };
+    const inicio = meiaNoiteBR(h.a, h.m, h.d - 1);
+    const t = new Date(inicio.getTime() - FUSO_MS);
+    return { inicio, fim: meiaNoiteBR(h.a, h.m, h.d), titulo: "Relatório diário", rotulo: `${DIAS[t.getUTCDay()]}, ${ddmm(inicio)}/${t.getUTCFullYear()}` };
   }
   if (tipo === "semana") {
     const desdeSabado = (h.dow + 1) % 7;
