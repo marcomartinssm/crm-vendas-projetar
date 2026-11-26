@@ -1298,7 +1298,7 @@ async function carregarFunil() {
   const funis = [FUN.cfg.funil, FUN.pre?.funil, FUN.nut].filter(Boolean);
   const [st, ld] = await Promise.all([
     db.from('crm_vendas_status').select('*').eq('ativo', true).order('ordem'),
-    db.from('leads').select('id, nome, telefone, email, origem, campanha, codigo_imovel, corretor_id, fase_id, funil_id, fase_atualizada_em, valor_negociacao, created_at').in('funil_id', funis).order('fase_atualizada_em', { ascending: false }).limit(3000),
+    db.from('leads').select('id, numero, nome, telefone, email, origem, campanha, codigo_imovel, corretor_id, fase_id, funil_id, fase_atualizada_em, valor_negociacao, created_at').in('funil_id', funis).order('fase_atualizada_em', { ascending: false }).limit(3000),
   ]);
   if (f.error || st.error || ld.error) { aviso('Não foi possível carregar o funil.', true); return; }
   FUN.fases = f.data; FUN.status = st.data; // Vendo como SDR: ela enxerga os próprios leads e toda a Nutrição (mesma regra do banco, desde 22/11/2026).
@@ -1470,6 +1470,7 @@ function cardLead(l, comEtapa) {
     ${FUN.tarefa?.[l.id] && (new Date(FUN.tarefa[l.id].quando) > new Date() || a?.tipo !== 'agenda') ? `<div class="kaviso" style="color:var(--azul)">📅 Contato agendado:${esc(agendaTxt(FUN.tarefa[l.id].quando))}${FUN.tarefa[l.id].nota ? ' · ' + esc(FUN.tarefa[l.id].nota) : ''}</div>` : ''}
     ${comEtapa ? `<div class="s" style="color:var(--suave);margin-bottom:4px">${esc(faseNome(l.fase_id))}</div>` : ''}
     <div class="ktopo"><span class="kav">${esc(iniciais(l.nome))}</span><b>${esc(l.nome || 'Sem nome')}</b></div>
+    ${l.numero ? `<div class="s" style="color:var(--suave);margin:-2px 0 2px">Atendimento nº ${l.numero}</div>` : ''}
     ${l.telefone ? `<div class="ktel">☏ ${esc(l.telefone)} <button class="kcopia" data-copiar="${esc(l.telefone)}" title="Copiar telefone" aria-label="Copiar telefone">⧉</button></div>` : ''}
     <div class="selos"><span class="selo vinho">${esc(l.origem || 'Sem origem')}</span>${l.codigo_imovel ? `<span class="selo">Cód. ${esc(l.codigo_imovel)}</span>` : ''}${l.valor_negociacao ? `<span class="selo">${brl(l.valor_negociacao)}</span>` : ''}</div>
     ${gestor() || l.corretor_id !== usuario ? `<div class="s" style="margin-top:4px">${esc(CORRETORES[l.corretor_id] || 'Sem corretor')}</div>` : ''}
@@ -1609,14 +1610,17 @@ function telaFila() {
 // Busca e filtro de corretor (gestor), usados no funil e na fila do dia.
 function passaFiltro(l) {
   const q = FUN.busca.toLowerCase().replace(/\D/g, '');
+  // Número curto (até 5 dígitos, com ou sem "nº"/"#") = nº do atendimento ou código do imóvel, exatos; não procura pedaço de telefone.
+  const curto = /^\s*(n[ºo°]?\.?\s*|#)?\d{1,5}\s*$/i.test(FUN.busca);
   return (!FUN.corretor || l.corretor_id === FUN.corretor) &&
-    (!FUN.busca || [l.nome, l.telefone, l.codigo_imovel, l.origem].join(' ').toLowerCase().includes(FUN.busca.toLowerCase()) || (q && String(l.telefone || '').replace(/\D/g, '').includes(q)));
+    (!FUN.busca || (curto ? String(l.numero) === q || String(l.codigo_imovel || '').trim() === q
+      : [l.nome, l.telefone, l.codigo_imovel, l.origem].join(' ').toLowerCase().includes(FUN.busca.toLowerCase()) || (q && String(l.telefone || '').replace(/\D/g, '').includes(q))));
 }
 function barraFiltros(funilId, rotuloAtrasados, atrasado, fim) {
   const doFunil = (l) => !funilId || l.funil_id === funilId;
   const corrs = [...new Set(FUN.leads.map(l => l.corretor_id).filter(Boolean))].map(id => [id, CORRETORES[id] || 'Sem nome']).sort((a, b) => a[1].localeCompare(b[1]));
   return `<div class="barra">
-      <input id="fbusca" placeholder="Buscar nome, telefone ou código" value="${esc(FUN.busca)}">
+      <input id="fbusca" placeholder="Buscar nome, telefone, código ou nº do atendimento" value="${esc(FUN.busca)}">
       ${atrasado ? `<button data-soatrasados class="${FUN.soAtrasados ? 'principal' : ''}">${FUN.soAtrasados ? '✓ ' : ''}${rotuloAtrasados} (${FUN.leads.filter(l => doFunil(l) && atrasado(l)).length})</button>` : ''}
       ${gestor() ? `<select id="fcorretor"><option value="">Todos os corretores</option>${corrs.map(([id, n]) => `<option value="${id}" ${FUN.corretor === id ? 'selected' : ''}>${esc(n)}${eSdr(id) ? ' (SDR)' : ''}${(() => { const k = atrasado ? FUN.leads.filter(l => doFunil(l) && l.corretor_id === id && atrasado(l)).length : 0; return k ? ` · ${k} ${rotuloAtrasados.replace('Só ', '')}` : ''; })()}</option>`).join('')}</select>` : ''}
       ${fim || ''}
@@ -1631,7 +1635,7 @@ function telaLead() {
   return `<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap"><button data-voltarfunil>← Voltar para ${{ fila: 'a fila do dia', pre: 'o pré-atendimento', nut: 'a nutrição', funil: 'o funil' }[tela.de || abaDoLead(l)]}</button>${podeTransferir(l) ? `<button data-transferir="${l.id}">⇄ Transferir atendimento</button>` : ''}${podeEditarContato(l) ? `<button data-editarcontato="${l.id}">✎ Editar nome/telefone</button>` : ''}</div>
   <div class="det">
     <div class="card">
-      <h2 style="margin:0">${esc(l.nome || 'Sem nome')}</h2>
+      <h2 style="margin:0">${esc(l.nome || 'Sem nome')}${l.numero ? ` <span class="selo" style="vertical-align:middle;font-size:12px">Atendimento nº ${l.numero}</span>` : ''}</h2>
       ${FUN.alerta?.[l.id] ? `<div class="aviso" style="margin:8px 0;background:${FUN.alerta[l.id].nivel === 'vermelho' ? 'var(--vermelho-claro);color:var(--vermelho)' : 'var(--ambar-claro);color:var(--ambar)'}"><b>${esc(alertaTxt(FUN.alerta[l.id]))}</b></div>` : ''}
       <div style="color:var(--suave);font-size:14px">${noPre(l) ? 'Pré-atendimento' : noNut(l) ? 'Nutrição' : 'Funil de vendas'} · hoje em <b>${esc(faseNome(atual))}</b> · ${esc(CORRETORES[l.corretor_id] || 'Sem corretor')}${eSdr(l.corretor_id) ? ' (SDR)' : ''}</div>
       <div class="bloco" style="margin-top:12px">
